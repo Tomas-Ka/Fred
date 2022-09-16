@@ -11,8 +11,8 @@ load_dotenv()
 token = environ["TOKEN"]
 
 #-----------------------STATIC VARS----------------------
-#test guild, discord bot testing grounds
-TEST_GUILD = discord.Object(538846461614489675) #752506220400607295
+#test guild, discord bot testing grounds 
+TEST_GUILD = discord.Object(752506220400607295) #538846461614489675
 
 
 #-----------------------MAIN CLASS-----------------------
@@ -40,7 +40,8 @@ class FredBot(commands.Bot):
             'cogs.dice_roller',
             'cogs.quest_handler',
             'cogs.sticky_handler',
-            'cogs.archive_handler'
+            'cogs.archive_handler',
+            'cogs.whale_handler'
             ]
         
         for extension in extensions:
