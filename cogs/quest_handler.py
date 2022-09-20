@@ -236,11 +236,11 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await interaction.response.send_message("Quest delete confiramation failed, names did not match.", ephemeral=True)
             return
 
-        if not self.msg_del_flag.value.lower() == "yes" or self.msg_del_flag.value.lower() == "no":
+        if not self.msg_del_flag.value.lower() == "yes" and not self.msg_del_flag.value.lower() == "no":
             await interaction.response.send_message("Message deletion flag has to be yes or no", ephemeral=True)
             return
 
-        if not self.thread_del_flag.value.lower() == "yes" or self.thread_del_flag.value.lower() == "no":
+        if not self.thread_del_flag.value.lower() == "yes" and not self.thread_del_flag.value.lower() == "no":
             await interaction.response.send_message("Thread deletion flag has to be yes or no", ephemeral=True)
             return
 
