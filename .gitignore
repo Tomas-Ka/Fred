@@ -1,0 +1,5 @@
+# Compiled binaries
+**/__pycache__
+
+# Environments
+.env
