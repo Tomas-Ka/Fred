@@ -1,10 +1,10 @@
 # -*- coding: UTF-8 -*-
-import discord
-from discord.ext import commands
 # traceback is for error logging
 import traceback
-
 from os import environ
+
+import discord
+from discord.ext import commands
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -60,8 +60,8 @@ class FredBot(commands.Bot):
         # self.tree.copy_global_to(guild=TEST_GUILD)
         # await self.tree.sync(guild=TEST_GUILD)
 
+
 # ------------------------MAIN CODE-----------------------
-
-
 bot = FredBot(command_prefix="!")
-bot.run(token)  # Fred
+if __name__ == "__main__":
+    bot.run(token)  # Fred
