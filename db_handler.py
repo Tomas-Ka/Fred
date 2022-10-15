@@ -167,17 +167,16 @@ if __name__ == "__main__":
 
         @bot.listen()
         async def on_ready():
-
             with open(f'QUESTS.dat', 'rb') as quests:
                 QUESTS = pickle.load(quests)
             await bot.wait_until_ready()
-            print("hello")
             for id in QUESTS:
                 obj: QuestInfo = QUESTS[id]
                 print(obj.quest_title)
-                if obj.quest_title == "aa":
+                print(obj.thread_id)
+                if obj.quest_title == "aa" or obj.thread_id == 1019875727824396290:
+                    print("skipping")
                     continue
-
                 print("------------------------")
                 print(bot.get_channel(1002356135816343632))
                 print(obj.thread_id)
