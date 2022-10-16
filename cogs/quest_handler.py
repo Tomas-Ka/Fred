@@ -15,7 +15,6 @@ import db_handler as db
 
 
 # -----------------------STATIC VARS----------------------
-QUESTS = {}
 # VS Code is annoying and runs the code in the home directory. This shouldn't be requred once I actually run the code as a standalone
 # Then I should just change this to "."
 FILE_LOCATION = "."
@@ -139,7 +138,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         default="Teal"
     )
 
-    async def on_submit(self, interaction: discord.Interaction) -> None:        
+    async def on_submit(self, interaction: discord.Interaction) -> None:
         # create embed for the message (with error handling for the colour
         # selection)
         try:
@@ -178,19 +177,20 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         await message.pin()
 
         # update the QuestInfo in memory
-        QUESTS[msg.id] = QuestInfo(self.quest_title.value,
-                                   self.contractor.value,
-                                   self.description.value,
-                                   self.reward.value,
-                                   embed_colour,
-                                   thread.id,
-                                   quest_role.id,
-                                   message)
 
-        write_quests()
+        quest = QuestInfo(self.quest_title.value,
+                          self.contractor.value,
+                          self.description.value,
+                          self.reward.value,
+                          embed_colour,
+                          thread.id,
+                          quest_role.id,
+                          message)
+
+        db.create_quest(msg.id, quest)
 
         # set the quest join button into the quest info message
-        await msg.edit(view=PersistentQuestJoinView(QUESTS[msg.id]))
+        await msg.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -205,7 +205,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
     def __init__(self, message: discord.Message) -> None:
         super().__init__()
         self.message = message
-        self.quest_info: QuestInfo = QUESTS[self.message.id]
+        self.quest_info: QuestInfo = db.get_quest(self.message.id)
         self.quest_title.default = self.quest_info.quest_title
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
@@ -264,22 +264,21 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
         #embed.set_footer(text="I have no clue what to put here")
         await self.message.edit(embed=embed)
-        
+
         # edit thread and role names
         await self.message.channel.get_thread(thread_id).edit(name=self.quest_title.value)
         await self.message.guild.get_role(quest_role_id).edit(name=self.quest_title.value)
 
-        # update the QuestInfo in memory
-        QUESTS[self.message.id] = QuestInfo(self.quest_title.value,
-                                            self.contractor.value,
-                                            self.description.value,
-                                            self.reward.value,
-                                            self.embed_colour.value,
-                                            thread_id,
-                                            quest_role_id,
-                                            self.quest_info.player_message)
-        write_quests()
-        await self.message.edit(view=PersistentQuestJoinView(QUESTS[self.message.id]))
+        quest = QuestInfo(self.quest_title.value,
+                          self.contractor.value,
+                          self.description.value,
+                          self.reward.value,
+                          self.embed_colour.value,
+                          thread_id,
+                          quest_role_id,
+                          self.quest_info.player_message)
+        db.update_quest(self.message.id, quest)
+        await self.message.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -294,7 +293,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
     def __init__(self, message: discord.Message) -> None:
         super().__init__()
         self.message = message
-        self.quest_info: QuestInfo = QUESTS[self.message.id]
+        self.quest_info: QuestInfo = db.get_quest(self.message.id)
         if len(self.quest_info.quest_title) < 16:
             self.title = f"Delete Quest {self.quest_info.quest_title}"
             self.confirmation.label = f'Type questname: "{self.quest_info.quest_title}" to confirm'
@@ -343,7 +342,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # otherwise, disable the join quest button
         else:
             disabled_view = PersistentQuestJoinView(
-                QUESTS[self.message.id], disabled=True)
+                self.quest_info, disabled=True)
             await self.message.edit(view=disabled_view)
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
@@ -358,11 +357,8 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         #del role
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
 
-        # del memory storage
-        del QUESTS[self.message.id]
-
-        # update storage
-        write_quests()
+        #del quest
+        db.del_quest(self.message.id)
 
         await interaction.response.send_message(f"Quest {self.quest_info.quest_title} removed!", ephemeral=True)
 
@@ -372,17 +368,9 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
 
-
-# -----------------------FUNCTIONS------------------------
-def write_quests() -> None:
-    """Writes quests to disk from memory
-    """    
-    with open(f'{FILE_LOCATION}/QUESTS.dat', 'wb') as quests:
-        pickle.dump(QUESTS, quests)
-        quests.truncate()
-
-
 # -----------------------MAIN CLASS-----------------------
+
+
 class QuestHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -416,19 +404,13 @@ class QuestHandler(commands.Cog):
 # and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
-    global QUESTS
 
-    # load in the data and set it up in the global var
-    with open(f'{FILE_LOCATION}/QUESTS.dat', 'rb') as quests:
-        QUESTS = pickle.load(quests)
-
-    # load quests
-    if not QUESTS == {}:
-        print("\t\tLoading quests:")
-    else:
-        print("\t\tNo quests to load")
-    for quest in QUESTS:
-        bot.add_view(PersistentQuestJoinView(QUESTS[quest]))
-        print(f"\t\t\t{QUESTS[quest].quest_title}")
+    print("\t\tQuests in database:")
+    quests = db.get_quest_list()
+    for quest in quests:
+        bot.add_view(PersistentQuestJoinView(quest))
+        print(f"\t\t\t{quest.quest_title}")
+    if not quests:
+        print(f"\t\t\tNo quests in db!")
 
     await bot.add_cog(QuestHandler(bot))

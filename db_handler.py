@@ -1,3 +1,4 @@
+from email import message
 import sqlite3
 from sqlite3 import Connection, Error
 from typing import List
@@ -24,6 +25,34 @@ def create_connection(path) -> Connection:
     return connection
 
 
+def create_tables() -> None:
+    """Initialization function to create the database if it doesn't exist yet.
+    """
+    create_quests_table = """
+    CREATE TABLE IF NOT EXISTS quests (
+        "id" INTEGER PRIMARY KEY NOT NULL,
+        "quest_title" TEXT UNIQUE NOT NULL,
+        "contractor" TEXT NOT NULL,
+        "description" TEXT NOT NULL,
+        "reward" TEXT NOT NULL,
+        "embed_colour" TEXT NOT NULL,
+        "thread_id" INTEGER NOT NULL,
+        "quest_role_id" INTEGER NOT NULL,
+        "pin_message_id" INTEGER NOT NULL,
+        "players" BLOB
+    );
+    """
+    execute_query(connection, create_quests_table)
+
+    create_stickies_table = """
+    CREATE TABLE IF NOT EXISTS stickies (
+        "channel_id" INTEGER UNIQUE,
+        "message_id" INTEGER UNIQUE
+    );
+    """
+    execute_query(connection, create_stickies_table)
+
+
 def execute_query(connection: Connection, query: str) -> None:
     """Execute the given query with the given connection (database).
 
@@ -38,9 +67,6 @@ def execute_query(connection: Connection, query: str) -> None:
         print("Query executed successfully")
     except Error as e:
         print(f"The error '{e}' occurred")
-
-# Same as execute_query except it can return values, so it's to be used
-# when reading from the db
 
 
 def execute_read_query(connection: Connection, query: List):
@@ -97,7 +123,7 @@ def get_quest(quest_id: int) -> QuestInfo:
     """
     quest_query = f"""
     SELECT * FROM quests
-    WHERE id = '{quest_id}'"""
+    WHERE id = '{quest_id}';"""
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
@@ -117,7 +143,7 @@ def get_quest_list() -> List[QuestInfo]:
     """
 
     quest_querty = f"""
-    SELECT * FROM quests
+    SELECT * FROM quests;
     """
 
     query_return = execute_read_query(connection, quest_querty)
@@ -125,33 +151,6 @@ def get_quest_list() -> List[QuestInfo]:
     for quest in query_return:
         quests.append(QuestInfo(*quest[1:]))
     return quests
-
-def create_tables() -> None:
-    """Initialization function to create the database if it doesn't exist yet.
-    """
-    create_quests_table = """
-    CREATE TABLE IF NOT EXISTS quests (
-        "id" INTEGER PRIMARY KEY NOT NULL,
-        "quest_title" TEXT UNIQUE NOT NULL,
-        "contractor" TEXT NOT NULL,
-        "description" TEXT NOT NULL,
-        "reward" TEXT NOT NULL,
-        "embed_colour" TEXT NOT NULL,
-        "thread_id" INTEGER NOT NULL,
-        "quest_role_id" INTEGER NOT NULL,
-        "pin_message_id" INTEGER NOT NULL,
-        "players" BLOB
-    );
-    """
-    execute_query(connection, create_quests_table)
-
-    create_stickies_table = """
-    CREATE TABLE IF NOT EXISTS stickies (
-        "channel_id" INTEGER UNIQUE,
-        "message_id" INTEGER UNIQUE
-    );
-    """
-    execute_query(connection, create_stickies_table)
 
 
 def create_quest(id: int, quest_info: QuestInfo) -> None:
@@ -178,7 +177,32 @@ def create_quest(id: int, quest_info: QuestInfo) -> None:
     execute_query(connection, quest_add)
 
 
-def remove_quest_by_title(quest_title: str) -> None:
+def update_quest(id: int, quest_info: QuestInfo) -> None:
+    """Updates an already existing quest by id.
+
+    Args:
+        id (int): The id of the quest to update.
+        quest_info (QuestInfo): The info to update the quest with.
+    """
+    quest_update = f"""
+    UPDATE quests
+    SET (
+        quest_title = '{quest_info.quest_title}'
+        contractor = '{quest_info.contractor}'
+        description = '{quest_info.description}'
+        reward = '{quest_info.reward}'
+        embed_colour = '{quest_info.embed_colour}'
+        thread_id = '{quest_info.thread_id}'
+        quest_role_id = '{quest_info.quest_role_id}'
+        pin_message_id = '{quest_info.pin_message_id}'
+        )
+    WHERE
+        id = '{id}'
+    """
+    execute_query(connection, quest_update)
+
+
+def del_quest_by_title(quest_title: str) -> None:
     """Remove a quest from the db given a quest title.
 
     Args:
@@ -188,7 +212,7 @@ def remove_quest_by_title(quest_title: str) -> None:
     execute_query(connection, quest_del)
 
 
-def remove_quest(id: int) -> None:
+def del_quest(id: int) -> None:
     """Remove a quest from the db given an id.
 
     Args:
@@ -196,6 +220,34 @@ def remove_quest(id: int) -> None:
     """
     quest_del = f"DELETE FROM quests WHERE id = '{id}'"
     execute_query(connection, quest_del)
+
+
+def get_sticky(channel_id: int) -> int:
+    """Returns a sticky given the id of the channel it's in.
+
+    Args:
+        channel_id (int): The id of the channel the sticky is in.
+
+    Returns:
+        int: The id if the sticky message itself.
+    """
+    sticky_query = f"""
+    SELECT * FROM stickies
+    WHERE id = '{channel_id}'"""
+    # This returns a list and we take the first object as there should only
+    # ever be one due to unique constraints in the db
+    return execute_read_query(connection, sticky_query)[0]
+
+
+def get_sticky_list() -> List[int]:
+    """Returns a list of all stickies in the database.
+
+    Returns:
+        List[int]: A list of ids for the channels the stickies are in.
+    """
+    sticky_query = f"""
+    SELECT * FROM stickies"""
+    return execute_read_query(connection, sticky_query)
 
 
 def create_sticky(channel_id: int, message_id: int) -> None:
@@ -212,6 +264,23 @@ def create_sticky(channel_id: int, message_id: int) -> None:
         ('{channel_id}', '{message_id}');
     """
     execute_query(connection, sticky_add)
+
+
+def update_sticky(channel_id: int, message_id: int) -> None:
+    """Updates the sticky in a certain channel to another message.
+
+    Args:
+        channel_id (int): The id of the discord channel the sticky is in.
+        message_id (int): The id of the new sticky.
+    """
+    sticky_update = f"""
+    UPDATE stickies
+    SET
+        message_id = '{message_id}'
+    WHERE
+        id = '{channel_id}'
+    """
+    execute_query(connection, sticky_update)
 
 
 def del_sticky(channel_id: int):
