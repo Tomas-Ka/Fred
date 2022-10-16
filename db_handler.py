@@ -1,11 +1,10 @@
-from email import message
 import sqlite3
 from sqlite3 import Connection, Error
-from typing import List
+from typing import List, Tuple
 from cogs.quest_handler import QuestInfo
 
 
-def create_connection(path) -> Connection:
+def _create_connection(path) -> Connection:
     """Creates a new connection to the database file and returns an object
     we can use to get data from the db.
 
@@ -25,7 +24,7 @@ def create_connection(path) -> Connection:
     return connection
 
 
-def create_tables() -> None:
+def _create_tables() -> None:
     """Initialization function to create the database if it doesn't exist yet.
     """
     create_quests_table = """
@@ -42,7 +41,7 @@ def create_tables() -> None:
         "players" BLOB
     );
     """
-    execute_query(connection, create_quests_table)
+    _execute_query(connection, create_quests_table, ())
 
     create_stickies_table = """
     CREATE TABLE IF NOT EXISTS stickies (
@@ -50,26 +49,28 @@ def create_tables() -> None:
         "message_id" INTEGER UNIQUE
     );
     """
-    execute_query(connection, create_stickies_table)
+    _execute_query(connection, create_stickies_table, ())
 
 
-def execute_query(connection: Connection, query: str) -> None:
+def _execute_query(connection: Connection, query: str, vars: Tuple) -> None:
     """Execute the given query with the given connection (database).
 
     Args:
         connection (Connection): An sqlite3 database connecttion.
         query (str): The query string.
+        vars (Tuple): The vars to replace the spots in the queary string.
     """
     cursor = connection.cursor()
     try:
-        cursor.execute(query)
+        cursor.execute(query, vars)
         connection.commit()
         print("Query executed successfully")
     except Error as e:
         print(f"The error '{e}' occurred")
 
 
-def execute_read_query(connection: Connection, query: List):
+def _execute_multiple_read_query(
+        connection: Connection, query: List) -> List[Tuple]:
     """Same as execute_query except it returns values,
     and is used for reading from the db.
 
@@ -90,6 +91,27 @@ def execute_read_query(connection: Connection, query: List):
         print(f"The error '{e}' occurred")
 
 
+def _execute_read_query(connection: Connection,
+                        query: List, vars: Tuple) -> Tuple:
+    """Same as execute_read_query except it only returns a single value
+
+    Args:
+        connection (Connection): A connection to the database.
+        query (str): The string to query the database with.
+
+    Returns:
+        Tuple: A Touple containing the data at the found row.
+    """
+    cursor = connection.cursor()
+    result = None
+    try:
+        cursor.execute(query, vars)
+        result = cursor.fetchone()
+        return result
+    except Error as e:
+        print(f"The error '{e}' occurred")
+
+
 def get_quest_by_title(quest_title) -> QuestInfo:
     """Returns the first found quest given the quest title.
 
@@ -101,10 +123,10 @@ def get_quest_by_title(quest_title) -> QuestInfo:
     """
     quest_query = f"""
     SELECT * FROM quests
-    WHERE quest_title = '{quest_title}'"""
+    WHERE quest_title = ?"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = execute_read_query(connection, quest_query)[0]
+    query_return = _execute_read_query(connection, quest_query, (quest_title))
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
@@ -123,11 +145,11 @@ def get_quest(quest_id: int) -> QuestInfo:
     """
     quest_query = f"""
     SELECT * FROM quests
-    WHERE id = '{quest_id}';"""
+    WHERE id = ?;"""
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = execute_read_query(connection, quest_query)[0]
+    query_return = _execute_read_query(connection, quest_query, (quest_id))
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
@@ -146,7 +168,7 @@ def get_quest_list() -> List[QuestInfo]:
     SELECT * FROM quests;
     """
 
-    query_return = execute_read_query(connection, quest_querty)
+    query_return = _execute_multiple_read_query(connection, quest_querty)
     quests = []
     for quest in query_return:
         quests.append(QuestInfo(*quest[1:]))
@@ -169,12 +191,20 @@ def create_quest(id: int, quest_info: QuestInfo) -> None:
         quest_role_id, pin_message_id
         )
     VALUES
-        ({id}, "{quest_info.quest_title}", "{quest_info.contractor}",
-        "{quest_info.description}", "{quest_info.reward}",
-        "{quest_info.embed_colour}", {quest_info.thread_id},
-        {quest_info.quest_role_id}, {quest_info.pin_message_id});
+        (?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
-    execute_query(connection, quest_add)
+    vars = (
+        id,
+        quest_info.quest_title,
+        quest_info.contractor,
+        quest_info.description,
+        quest_info.reward,
+        quest_info.embed_colour,
+        quest_info.thread_id,
+        quest_info.quest_role_id,
+        quest_info.pin_message_id)
+
+    _execute_query(connection, quest_add, vars)
 
 
 def update_quest(id: int, quest_info: QuestInfo) -> None:
@@ -187,19 +217,30 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
     quest_update = f"""
     UPDATE quests
     SET (
-        quest_title = '{quest_info.quest_title}'
-        contractor = '{quest_info.contractor}'
-        description = '{quest_info.description}'
-        reward = '{quest_info.reward}'
-        embed_colour = '{quest_info.embed_colour}'
-        thread_id = '{quest_info.thread_id}'
-        quest_role_id = '{quest_info.quest_role_id}'
-        pin_message_id = '{quest_info.pin_message_id}'
+        quest_title = ?
+        contractor = ?
+        description = ?
+        reward = ?
+        embed_colour = ?
+        thread_id = ?
+        quest_role_id = ?
+        pin_message_id = ?
         )
     WHERE
-        id = '{id}'
+        id = ?
     """
-    execute_query(connection, quest_update)
+    vars = (
+        quest_info.quest_title,
+        quest_info.contractor,
+        quest_info.description,
+        quest_info.reward,
+        quest_info.embed_colour,
+        quest_info.thread_id,
+        quest_info.quest_role_id,
+        quest_info.pin_message_id,
+        id)
+
+    _execute_query(connection, quest_update, vars)
 
 
 def del_quest_by_title(quest_title: str) -> None:
@@ -208,8 +249,8 @@ def del_quest_by_title(quest_title: str) -> None:
     Args:
         quest_title (str): The title of the quest to remove.
     """
-    quest_del = f"DELETE FROM quests WHERE quest_title = '{quest_title}'"
-    execute_query(connection, quest_del)
+    quest_del = f"DELETE FROM quests WHERE quest_title = ?"
+    _execute_query(connection, quest_del, (quest_title))
 
 
 def del_quest(id: int) -> None:
@@ -218,8 +259,8 @@ def del_quest(id: int) -> None:
     Args:
         id (int): The id of the quest to remove.
     """
-    quest_del = f"DELETE FROM quests WHERE id = '{id}'"
-    execute_query(connection, quest_del)
+    quest_del = f"DELETE FROM quests WHERE id = ?"
+    _execute_query(connection, quest_del, (id))
 
 
 def get_sticky(channel_id: int) -> int:
@@ -233,10 +274,10 @@ def get_sticky(channel_id: int) -> int:
     """
     sticky_query = f"""
     SELECT * FROM stickies
-    WHERE id = '{channel_id}'"""
+    WHERE id = ?"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    return execute_read_query(connection, sticky_query)[0]
+    return _execute_read_query(connection, sticky_query, (channel_id))
 
 
 def get_sticky_list() -> List[int]:
@@ -247,7 +288,7 @@ def get_sticky_list() -> List[int]:
     """
     sticky_query = f"""
     SELECT * FROM stickies"""
-    return execute_read_query(connection, sticky_query)
+    return _execute_multiple_read_query(connection, sticky_query)
 
 
 def create_sticky(channel_id: int, message_id: int) -> None:
@@ -261,9 +302,9 @@ def create_sticky(channel_id: int, message_id: int) -> None:
     INSERT INTO
         stickies (channel_id, message_id)
     VALUES
-        ('{channel_id}', '{message_id}');
+        (?, ?);
     """
-    execute_query(connection, sticky_add)
+    _execute_query(connection, sticky_add, (channel_id, message_id))
 
 
 def update_sticky(channel_id: int, message_id: int) -> None:
@@ -276,11 +317,11 @@ def update_sticky(channel_id: int, message_id: int) -> None:
     sticky_update = f"""
     UPDATE stickies
     SET
-        message_id = '{message_id}'
+        message_id = ?
     WHERE
-        id = '{channel_id}'
+        id = ?
     """
-    execute_query(connection, sticky_update)
+    _execute_query(connection, sticky_update, (message_id, channel_id))
 
 
 def del_sticky(channel_id: int):
@@ -289,16 +330,16 @@ def del_sticky(channel_id: int):
     Args:
         channel_id (int): The Id of the channel to remove the sticky from
     """
-    sticky_del = f"DELETE FROM stickies WHERE id = '{channel_id}'"
-    execute_query(connection, sticky_del)
+    sticky_del = f"DELETE FROM stickies WHERE id = ?"
+    _execute_query(connection, sticky_del, (channel_id))
 
 
 global connection
-connection = create_connection("db.sqlite")
+connection = _create_connection("db.sqlite")
 
 
 if __name__ == "__main__":
-    create_tables()
+    _create_tables()
 
     # This is all setup for migrating from the old .dat system, and will be removed once the migration is over
     # TODO
