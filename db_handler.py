@@ -1,12 +1,19 @@
 import sqlite3
 from sqlite3 import Connection, Error
+from typing import List
 from cogs.quest_handler import QuestInfo
-
-# Creates a connection to the database file and returns an object
-# we can use to get data from the db
 
 
 def create_connection(path) -> Connection:
+    """Creates a new connection to the database file and returns an object
+    we can use to get data from the db.
+
+    Args:
+        path (str or bytepath): Path to the databasefile
+
+    Returns:
+        Connection: Object that can be used to communicate with the database
+    """
     connection = None
     try:
         connection = sqlite3.connect(path)
@@ -16,10 +23,14 @@ def create_connection(path) -> Connection:
 
     return connection
 
-# Execute the given query in the given connection (database)
 
+def execute_query(connection: Connection, query: str) -> None:
+    """Execute the given query with the given connection (database).
 
-def execute_query(connection, query) -> None:
+    Args:
+        connection (Connection): An sqlite3 database connecttion.
+        query (str): The query string.
+    """
     cursor = connection.cursor()
     try:
         cursor.execute(query)
@@ -32,7 +43,17 @@ def execute_query(connection, query) -> None:
 # when reading from the db
 
 
-def execute_read_query(connection, query):
+def execute_read_query(connection: Connection, query: List):
+    """Same as execute_query except it returns values,
+    and is used for reading from the db.
+
+    Args:
+        connection (Connection): A connection to the database.
+        query (str): The string to query the database with.
+
+    Returns:
+        List: a list containing all the data found from the query.
+    """
     cursor = connection.cursor()
     result = None
     try:
@@ -42,111 +63,159 @@ def execute_read_query(connection, query):
     except Error as e:
         print(f"The error '{e}' occurred")
 
-# Func to get a quest by the title
 
+def get_quest_by_title(quest_title) -> QuestInfo:
+    """Returns the first found quest given the quest title.
 
-def get_quest_by_title(quest_title) -> None:
-  """returns a quest given the quest title
+    Args:
+        quest_title (string): The title of the quest to search for.
 
-  Args:
-      quest_title (string): The title of the quest to search for
-  """  
-  quest_query = f"""
+    Returns:
+        QuestInfo: An object containing the data from the db.
+    """
+    quest_query = f"""
   SELECT * FROM quests
   WHERE quest_title = '{quest_title}'"""
+    # This returns a list and we take the first object as there should only
+    # ever be one due to unique constraints in the db
+    query_return = execute_read_query(connection, quest_query)[0]
 
-  return execute_read_query(connection, quest_query)
+    # The first value returned is the id of the quest, which we don't want to
+    # parse
+    quest = QuestInfo(*query_return[1:])
+    return quest
 
-# Initialization function to create the database if it doesn't exist yet
 
-def get_quest(quest_id: int) -> None:
-  """Returns a quest given a quest id
+def get_quest(quest_id: int) -> QuestInfo:
+    """Returns a quest given a quest id.
 
-  Args:
-      quest_id (int): The quest id to get from the database
-  """
-  quest_query = f"""
+    Args:
+        quest_id (int): The quest id to get from the database.
+
+    Returns:
+        QuestInfo: An object containing the data from the db.
+    """
+    quest_query = f"""
   SELECT * FROM quests
   WHERE id = '{quest_id}'"""
 
+    # This returns a list and we take the first object as there should only
+    # ever be one due to unique constraints in the db
+    query_return = execute_read_query(connection, quest_query)[0]
+
+    # The first value returned is the id of the quest, which we don't want to
+    # parse
+    quest = QuestInfo(*query_return[1:])
+    return quest
+
 
 def create_tables() -> None:
-    create_quests_table = """
-    CREATE TABLE IF NOT EXISTS quests (
-      "id" INTEGER PRIMARY KEY NOT NULL,
-      "quest_title" TEXT UNIQUE NOT NULL,
-      "contractor" TEXT NOT NULL,
-      "description" TEXT NOT NULL,
-      "reward" TEXT NOT NULL,
-      "embed_colour" TEXT NOT NULL,
-      "thread_id" INTEGER NOT NULL,
-      "quest_role_id" INTEGER NOT NULL,
-      "pin_message_id" INTEGER NOT NULL,
-      "players" BLOB
-    );
+    """Initialization function to create the database if it doesn't exist yet.
     """
+    create_quests_table = """
+  CREATE TABLE IF NOT EXISTS quests (
+    "id" INTEGER PRIMARY KEY NOT NULL,
+    "quest_title" TEXT UNIQUE NOT NULL,
+    "contractor" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "reward" TEXT NOT NULL,
+    "embed_colour" TEXT NOT NULL,
+    "thread_id" INTEGER NOT NULL,
+    "quest_role_id" INTEGER NOT NULL,
+    "pin_message_id" INTEGER NOT NULL,
+    "players" BLOB
+  );
+  """
     execute_query(connection, create_quests_table)
 
     create_stickies_table = """
-    CREATE TABLE IF NOT EXISTS stickies (
-      "channel_id" INTEGER UNIQUE,
-      "message_id" INTEGER UNIQUE
-    );
-    """
+  CREATE TABLE IF NOT EXISTS stickies (
+    "channel_id" INTEGER UNIQUE,
+    "message_id" INTEGER UNIQUE
+  );
+  """
     execute_query(connection, create_stickies_table)
-
-# Add a quest to the db
 
 
 def create_quest(id: int, quest_info: QuestInfo) -> None:
-    quest_add = f"""
-    INSERT INTO
-      quests (
-        id, quest_title, contractor,
-        description, reward,
-        embed_colour, thread_id,
-        quest_role_id, pin_message_id
-      )
-    VALUES
-      ({id}, "{quest_info.quest_title}", "{quest_info.contractor}",
-      "{quest_info.description}", "{quest_info.reward}",
-      "{quest_info.embed_colour}", {quest_info.thread_id},
-      {quest_info.quest_role_id}, {quest_info.pin_message_id});
+    """Adds a quest to the db.
+
+    Args:
+        id (int): The message id the quest is linked to in both the database, and discord.
+        quest_info (QuestInfo): The information to store in the database.
     """
+    quest_add = f"""
+  INSERT INTO
+    quests (
+      id, quest_title, contractor,
+      description, reward,
+      embed_colour, thread_id,
+      quest_role_id, pin_message_id
+    )
+  VALUES
+    ({id}, "{quest_info.quest_title}", "{quest_info.contractor}",
+    "{quest_info.description}", "{quest_info.reward}",
+    "{quest_info.embed_colour}", {quest_info.thread_id},
+    {quest_info.quest_role_id}, {quest_info.pin_message_id});
+  """
     execute_query(connection, quest_add)
 
 
-# Remove a quest from the db given a quest title
-def remove_quest(quest_title) -> None:
-    quest_del = f"DELETE FROM quests WHERE quest_title = {quest_title}"
+def remove_quest_by_title(quest_title: str) -> None:
+    """Remove a quest from the db given a quest title.
+
+    Args:
+        quest_title (str): The title of the quest to remove.
+    """
+    quest_del = f"DELETE FROM quests WHERE quest_title = '{quest_title}'"
     execute_query(connection, quest_del)
 
-# Add a new sticky to the database
+
+def remove_quest(id: int) -> None:
+    """Remove a quest from the db given an id.
+
+    Args:
+        id (int): The id of the quest to remove.
+    """
+    quest_del = f"DELETE FROM quests WHERE id = '{id}'"
+    execute_query(connection, quest_del)
 
 
 def create_sticky(channel_id: int, message_id: int) -> None:
-    sticky_add = f"""
-    INSERT INTO
-      stickies (channel_id, message_id)
-    VALUES
-      ({channel_id}, {message_id});
-    """
-    execute_query(connection, sticky_add)
+    """Adds a new sticky to the database.
 
-# Removed a sticky from the db given a channel id
+    Args:
+        channel_id (int): The discord Channel id of the message.
+        message_id (int): The id of the message itself.
+    """
+    sticky_add = f"""
+  INSERT INTO
+    stickies (channel_id, message_id)
+  VALUES
+    ('{channel_id}', '{message_id}');
+  """
+    execute_query(connection, sticky_add)
 
 
 def del_sticky(channel_id: int):
-    sticky_del = f"DELETE FROM stickies WHERE id = {channel_id}"
+    """Remove a sticky from the db given a channel id
+
+    Args:
+        channel_id (int): The Id of the channel to remove the sticky from
+    """
+    sticky_del = f"DELETE FROM stickies WHERE id = '{channel_id}'"
     execute_query(connection, sticky_del)
 
 
 global connection
 connection = create_connection("db.sqlite")
 
+
 if __name__ == "__main__":
     create_tables()
 
+    # This is all setup for migrating from the old .dat system, and will be removed once the migration is over
+    # TODO
     if (input("connect to discord and send pin messages?") == "y"):
         import main
         from main import bot
