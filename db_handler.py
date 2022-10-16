@@ -130,7 +130,8 @@ def get_quest_by_title(quest_title) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    quest = QuestInfo(*query_return[1:])
+    if quest:
+        quest = QuestInfo(*query_return[1:])
     return quest
 
 
@@ -149,11 +150,12 @@ def get_quest(quest_id: int) -> QuestInfo:
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = _execute_read_query(connection, quest_query, (quest_id))
+    query_return = _execute_read_query(connection, quest_query, (quest_id,))
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    quest = QuestInfo(*query_return[1:])
+    if quest:
+        quest = QuestInfo(*query_return[1:])
     return quest
 
 
@@ -170,8 +172,9 @@ def get_quest_list() -> List[QuestInfo]:
 
     query_return = _execute_multiple_read_query(connection, quest_querty)
     quests = []
-    for quest in query_return:
-        quests.append(QuestInfo(*quest[1:]))
+    if quest:
+        for quest in query_return:
+            quests.append(QuestInfo(*quest[1:]))
     return quests
 
 
@@ -202,7 +205,7 @@ def create_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.embed_colour,
         quest_info.thread_id,
         quest_info.quest_role_id,
-        quest_info.pin_message_id)
+        quest_info.pin_message_id,)
 
     _execute_query(connection, quest_add, vars)
 
@@ -238,7 +241,7 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.thread_id,
         quest_info.quest_role_id,
         quest_info.pin_message_id,
-        id)
+        id,)
 
     _execute_query(connection, quest_update, vars)
 
@@ -250,7 +253,7 @@ def del_quest_by_title(quest_title: str) -> None:
         quest_title (str): The title of the quest to remove.
     """
     quest_del = f"DELETE FROM quests WHERE quest_title = ?"
-    _execute_query(connection, quest_del, (quest_title))
+    _execute_query(connection, quest_del, (quest_title,))
 
 
 def del_quest(id: int) -> None:
@@ -260,7 +263,7 @@ def del_quest(id: int) -> None:
         id (int): The id of the quest to remove.
     """
     quest_del = f"DELETE FROM quests WHERE id = ?"
-    _execute_query(connection, quest_del, (id))
+    _execute_query(connection, quest_del, (id,))
 
 
 def get_sticky(channel_id: int) -> int:
@@ -277,7 +280,7 @@ def get_sticky(channel_id: int) -> int:
     WHERE id = ?"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    return _execute_read_query(connection, sticky_query, (channel_id))
+    return _execute_read_query(connection, sticky_query, (channel_id,))
 
 
 def get_sticky_list() -> List[int]:
@@ -304,7 +307,7 @@ def create_sticky(channel_id: int, message_id: int) -> None:
     VALUES
         (?, ?);
     """
-    _execute_query(connection, sticky_add, (channel_id, message_id))
+    _execute_query(connection, sticky_add, (channel_id, message_id,))
 
 
 def update_sticky(channel_id: int, message_id: int) -> None:
@@ -321,7 +324,7 @@ def update_sticky(channel_id: int, message_id: int) -> None:
     WHERE
         id = ?
     """
-    _execute_query(connection, sticky_update, (message_id, channel_id))
+    _execute_query(connection, sticky_update, (message_id, channel_id,))
 
 
 def del_sticky(channel_id: int):
@@ -331,7 +334,7 @@ def del_sticky(channel_id: int):
         channel_id (int): The Id of the channel to remove the sticky from
     """
     sticky_del = f"DELETE FROM stickies WHERE id = ?"
-    _execute_query(connection, sticky_del, (channel_id))
+    _execute_query(connection, sticky_del, (channel_id,))
 
 
 global connection
