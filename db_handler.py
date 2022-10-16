@@ -98,7 +98,7 @@ def create_tables() -> None:
 # Add a quest to the db
 
 
-def add_quest(id: int, quest_info: QuestInfo) -> None:
+def create_quest(id: int, quest_info: QuestInfo) -> None:
     quest_add = f"""
     INSERT INTO
       quests (
@@ -124,7 +124,7 @@ def remove_quest(quest_title) -> None:
 # Add a new sticky to the database
 
 
-def add_sticky(channel_id: int, message_id: int) -> None:
+def create_sticky(channel_id: int, message_id: int) -> None:
     sticky_add = f"""
     INSERT INTO
       stickies (channel_id, message_id)
