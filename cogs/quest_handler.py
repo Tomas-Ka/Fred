@@ -10,6 +10,8 @@ import traceback
 # discord.py can work with
 import webcolors
 
+import json
+
 # -----------------------STATIC VARS----------------------
 QUESTS = {}
 # VS Code is annoying and runs the code in the home directory. This shouldn't be requred once I actually run the code as a standalone
@@ -29,7 +31,9 @@ class QuestInfo():
             reward: str,
             embed_colour: str,
             thread_id: int,
-            quest_role_id: int) -> None:
+            quest_role_id: int,
+            message: discord.Message,
+            players: str = None) -> None:
         self.quest_title = quest_title
         self.contractor = contractor
         self.description = description
@@ -37,6 +41,22 @@ class QuestInfo():
         self.embed_colour = embed_colour
         self.thread_id = thread_id
         self.quest_role_id = quest_role_id
+        self.player_message = message
+        if players != None:
+            self.players = json.load(players)
+        else:
+            self.players = []
+    
+    #adds a player (in the form of a member object) to the list
+    def add_player(self, member: discord.Member) -> None:
+        self.players.append(member)
+    
+    #removes a player (as a member object) from the list
+    def remove_player(self, member: discord.Member) -> None:
+        self.players.remove(member)
+        
+    def get_players_json(self) -> str:
+        return json.dumps(self._players)
 
 
 # ---------.----------PERSISTENT VIEWS--------------------
@@ -70,12 +90,22 @@ class PersistentQuestJoinView(discord.ui.View):
             await interaction.user.remove_roles(role)
             await thread.remove_user(interaction.user)
             await interaction.response.defer()
+            # if the user isn't a dm remove them from the player list
+            if not "Dm" in interaction.user.roles:
+                self.info.remove_player(interaction.user)
         else:
             # if user doesn't have role, add it and add user to the thread
             await interaction.user.add_roles(role)
             await thread.add_user(interaction.user)
             await interaction.response.defer()
-
+            # if the user isn't a dm, add them to the player list
+            if not "Dm" in interaction.user.roles:
+                self.info.add_player(interaction.user)
+        namestring = ""
+        for player in self.info.players:
+            namestring += player.display_name + "\n"
+        await self.info.player_message.edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
+    
 
 # ------------------------MODALS--------------------------
 class CreateQuest(discord.ui.Modal, title="Create Quest"):
@@ -111,16 +141,17 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         # create embed for the message (with error handling for the colour
         # selection)
         try:
-            embed = discord.Embed(
-                title=self.quest_title.value,
-                description=self.description.value,
-                color=discord.Color.from_str(
-                    webcolors.name_to_hex(
-                        self.embed_colour.value)))
+            embed_colour = webcolors.name_to_hex(self.embed_colour.value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
             await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
             return
+    
+        embed = discord.Embed(
+            title=self.quest_title.value,
+            description=self.description.value,
+            color=discord.Color.from_str(
+                    embed_colour))
         embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.avatar.url)
@@ -137,14 +168,18 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         msg = await interaction.channel.send(embed=embed)
         # create & attatch the thread to the newly created quest info message
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
+        # send the player amount message in the thread and pin it
+        message: discord.Message = await thread.send(embed=discord.Embed(title="Players:", color=discord.Color.from_str(embed_colour)))
+        await message.pin()
         # update the QuestInfo in memory
         QUESTS[msg.id] = QuestInfo(self.quest_title.value,
                                    self.contractor.value,
                                    self.description.value,
                                    self.reward.value,
-                                   self.embed_colour.value,
+                                   embed_colour,
                                    thread.id,
-                                   quest_role.id)
+                                   quest_role.id,
+                                   message)
 
         write_quests()
 
@@ -234,7 +269,8 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                                             self.reward.value,
                                             self.embed_colour.value,
                                             thread_id,
-                                            quest_role_id)
+                                            quest_role_id,
+                                            self.quest_info.player_message)
         write_quests()
         await self.message.edit(view=PersistentQuestJoinView(QUESTS[self.message.id]))
         await interaction.response.defer()

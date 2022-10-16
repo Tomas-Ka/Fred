@@ -45,20 +45,35 @@ def execute_read_query(connection, query):
 # Func to get a quest by the title
 
 
-def get_quest_by_title(quest_title):
-    quest_query = f"""
-    SELECT * FROM quests
-    WHERE quest_title = {quest_title}"""
+def get_quest_by_title(quest_title) -> None:
+  """returns a quest given the quest title
 
-    return execute_read_query(connection, quest_query)
+  Args:
+      quest_title (string): The title of the quest to search for
+  """  
+  quest_query = f"""
+  SELECT * FROM quests
+  WHERE quest_title = '{quest_title}'"""
+
+  return execute_read_query(connection, quest_query)
 
 # Initialization function to create the database if it doesn't exist yet
+
+def get_quest(quest_id: int) -> None:
+  """Returns a quest given a quest id
+
+  Args:
+      quest_id (int): The quest id to get from the database
+  """
+  quest_query = f"""
+  SELECT * FROM quests
+  WHERE id = '{quest_id}'"""
 
 
 def create_tables() -> None:
     create_quests_table = """
     CREATE TABLE IF NOT EXISTS quests (
-      "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+      "id" INTEGER PRIMARY KEY NOT NULL,
       "quest_title" TEXT UNIQUE NOT NULL,
       "contractor" TEXT NOT NULL,
       "description" TEXT NOT NULL,
@@ -83,40 +98,20 @@ def create_tables() -> None:
 # Add a quest to the db
 
 
-def add_quest(quest_info: QuestInfo) -> None:
+def add_quest(id: int, quest_info: QuestInfo) -> None:
     quest_add = f"""
     INSERT INTO
       quests (
-        quest_title, contractor,
+        id, quest_title, contractor,
         description, reward,
         embed_colour, thread_id,
         quest_role_id, pin_message_id
       )
     VALUES
-      ("{quest_info.quest_title}", "{quest_info.contractor}",
+      ({id}, "{quest_info.quest_title}", "{quest_info.contractor}",
       "{quest_info.description}", "{quest_info.reward}",
       "{quest_info.embed_colour}", {quest_info.thread_id},
       {quest_info.quest_role_id}, {quest_info.pin_message_id});
-    """
-    execute_query(connection, quest_add)
-
-# Add a quest to the db (that uses the old quest class)
-
-
-def add_old_quest(quest_info: QuestInfo) -> None:
-    quest_add = f"""
-    INSERT INTO
-      quests (
-        quest_title, contractor,
-        description, reward,
-        embed_colour, thread_id,
-        quest_role_id
-      )
-    VALUES
-      ("{quest_info.quest_title}", "{quest_info.contractor}",
-      "{quest_info.description}", "{quest_info.reward}",
-      "{quest_info.embed_colour}", {quest_info.thread_id},
-      {quest_info.quest_role_id});
     """
     execute_query(connection, quest_add)
 
