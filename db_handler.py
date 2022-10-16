@@ -74,8 +74,8 @@ def get_quest_by_title(quest_title) -> QuestInfo:
         QuestInfo: An object containing the data from the db.
     """
     quest_query = f"""
-  SELECT * FROM quests
-  WHERE quest_title = '{quest_title}'"""
+    SELECT * FROM quests
+    WHERE quest_title = '{quest_title}'"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
     query_return = execute_read_query(connection, quest_query)[0]
@@ -96,8 +96,8 @@ def get_quest(quest_id: int) -> QuestInfo:
         QuestInfo: An object containing the data from the db.
     """
     quest_query = f"""
-  SELECT * FROM quests
-  WHERE id = '{quest_id}'"""
+    SELECT * FROM quests
+    WHERE id = '{quest_id}'"""
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
@@ -109,31 +109,48 @@ def get_quest(quest_id: int) -> QuestInfo:
     return quest
 
 
+def get_quest_list() -> List[QuestInfo]:
+    """Returns a list of all quests in the database
+
+    Returns:
+        List[QuestInfo]: The list of objects
+    """
+
+    quest_querty = f"""
+    SELECT * FROM quests
+    """
+
+    query_return = execute_read_query(connection, quest_querty)
+    quests = []
+    for quest in query_return:
+        quests.append(QuestInfo(*quest[1:]))
+    return quests
+
 def create_tables() -> None:
     """Initialization function to create the database if it doesn't exist yet.
     """
     create_quests_table = """
-  CREATE TABLE IF NOT EXISTS quests (
-    "id" INTEGER PRIMARY KEY NOT NULL,
-    "quest_title" TEXT UNIQUE NOT NULL,
-    "contractor" TEXT NOT NULL,
-    "description" TEXT NOT NULL,
-    "reward" TEXT NOT NULL,
-    "embed_colour" TEXT NOT NULL,
-    "thread_id" INTEGER NOT NULL,
-    "quest_role_id" INTEGER NOT NULL,
-    "pin_message_id" INTEGER NOT NULL,
-    "players" BLOB
-  );
-  """
+    CREATE TABLE IF NOT EXISTS quests (
+        "id" INTEGER PRIMARY KEY NOT NULL,
+        "quest_title" TEXT UNIQUE NOT NULL,
+        "contractor" TEXT NOT NULL,
+        "description" TEXT NOT NULL,
+        "reward" TEXT NOT NULL,
+        "embed_colour" TEXT NOT NULL,
+        "thread_id" INTEGER NOT NULL,
+        "quest_role_id" INTEGER NOT NULL,
+        "pin_message_id" INTEGER NOT NULL,
+        "players" BLOB
+    );
+    """
     execute_query(connection, create_quests_table)
 
     create_stickies_table = """
-  CREATE TABLE IF NOT EXISTS stickies (
-    "channel_id" INTEGER UNIQUE,
-    "message_id" INTEGER UNIQUE
-  );
-  """
+    CREATE TABLE IF NOT EXISTS stickies (
+        "channel_id" INTEGER UNIQUE,
+        "message_id" INTEGER UNIQUE
+    );
+    """
     execute_query(connection, create_stickies_table)
 
 
@@ -145,19 +162,19 @@ def create_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info (QuestInfo): The information to store in the database.
     """
     quest_add = f"""
-  INSERT INTO
-    quests (
-      id, quest_title, contractor,
-      description, reward,
-      embed_colour, thread_id,
-      quest_role_id, pin_message_id
-    )
-  VALUES
-    ({id}, "{quest_info.quest_title}", "{quest_info.contractor}",
-    "{quest_info.description}", "{quest_info.reward}",
-    "{quest_info.embed_colour}", {quest_info.thread_id},
-    {quest_info.quest_role_id}, {quest_info.pin_message_id});
-  """
+    INSERT INTO
+        quests (
+        id, quest_title, contractor,
+        description, reward,
+        embed_colour, thread_id,
+        quest_role_id, pin_message_id
+        )
+    VALUES
+        ({id}, "{quest_info.quest_title}", "{quest_info.contractor}",
+        "{quest_info.description}", "{quest_info.reward}",
+        "{quest_info.embed_colour}", {quest_info.thread_id},
+        {quest_info.quest_role_id}, {quest_info.pin_message_id});
+    """
     execute_query(connection, quest_add)
 
 
@@ -189,11 +206,11 @@ def create_sticky(channel_id: int, message_id: int) -> None:
         message_id (int): The id of the message itself.
     """
     sticky_add = f"""
-  INSERT INTO
-    stickies (channel_id, message_id)
-  VALUES
-    ('{channel_id}', '{message_id}');
-  """
+    INSERT INTO
+        stickies (channel_id, message_id)
+    VALUES
+        ('{channel_id}', '{message_id}');
+    """
     execute_query(connection, sticky_add)
 
 
