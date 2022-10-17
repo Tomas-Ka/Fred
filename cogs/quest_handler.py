@@ -59,9 +59,10 @@ class PersistentQuestJoinView(discord.ui.View):
             if "Dm" not in interaction.user.roles:
                 self.info.add_player(interaction.user)
         namestring = ""
-        for player in self.info.players:
+        for player in self.info._players:
             namestring += player.display_name + "\n"
         await self.info.player_message.edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
+
 
 
 # ------------------------MODALS--------------------------
@@ -200,16 +201,15 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         quest_role_id = self.quest_info.quest_role_id
 
         try:
-            embed = discord.Embed(
-                title=self.quest_title.value,
-                description=self.description.value,
-                color=discord.Color.from_str(
-                    webcolors.name_to_hex(
-                        self.embed_colour.value)))
+            self.embed_colour = webcolors.name_to_hex(self.embed_colour.value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
             await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
             return
+        embed = discord.Embed(
+            title=self.quest_title.value,
+            description=self.description.value,
+            color=discord.Color.from_str(self.embed_colour))
         embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.avatar.url)
@@ -229,13 +229,13 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           self.contractor.value,
                           self.description.value,
                           self.reward.value,
-                          self.embed_colour.value,
+                          self.embed_colour,
                           thread_id,
                           quest_role_id,
                           self.quest_info.pin_message_id,
-                          self.quest_info.player_message
+                          self.quest_info.player_message,
+                          self.quest_info.players
                           )
-        quest.players = self.quest_info.players
         db.update_quest(self.message.id, quest)
         await self.message.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()

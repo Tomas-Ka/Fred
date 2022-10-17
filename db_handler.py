@@ -228,7 +228,8 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
         embed_colour = ?,
         thread_id = ?,
         quest_role_id = ?,
-        pin_message_id = ?
+        pin_message_id = ?,
+        players = ?
     WHERE
         id = ?
     """
@@ -241,6 +242,7 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.thread_id,
         quest_info.quest_role_id,
         quest_info.pin_message_id,
+        quest_info.players,
         id,)
 
     _execute_query(connection, quest_update, vars)

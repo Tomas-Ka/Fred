@@ -1,6 +1,9 @@
 import json
 import discord
 
+# TODO: Make player_message an id instead of a discord.Message object.
+
+
 class QuestInfo():
     # This is just a blank class so I more easily can pass Quest data between
     # objects
@@ -26,17 +29,18 @@ class QuestInfo():
         self.player_message = player_message
         self.pin_message_id = pin_message_id
         if players is not None:
-            self.players = json.loads(players)
+            self._players = json.loads(players)
         else:
-            self.players = []
+            self._players = []
+
+    @property
+    def players(self) -> str:
+        return json.dumps(self._players)
 
     # adds a player (in the form of a member object) to the list
     def add_player(self, member: discord.Member) -> None:
-        self.players.append(member)
+        self._players.append(member)
 
     # removes a player (as a member object) from the list
     def remove_player(self, member: discord.Member) -> None:
-        self.players.remove(member)
-
-    def get_players_json(self) -> str:
-        return json.dumps(self._players)
+        self._players.remove(member)
