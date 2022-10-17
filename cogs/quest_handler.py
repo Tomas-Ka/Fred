@@ -5,7 +5,6 @@ from discord.ext import commands
 # traceback is for error logging
 import traceback
 # webcolors is needed to take colour names and make them into a hex value
-# discord.py can work with
 import webcolors
 import db_handler as db
 from helpers import QuestInfo

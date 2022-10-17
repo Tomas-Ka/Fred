@@ -3,8 +3,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from typing import Optional
-# pickle is for storing and retrieving data
-import pickle
 import db_handler as db
 
 
@@ -19,6 +17,7 @@ FILE_LOCATION = "."
 class StickyHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
+
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
@@ -39,6 +38,7 @@ class StickyHandler(commands.Cog):
         # proces the data of the sticky (update references and the like), and
         # write the changes to disk.
         db.update_sticky(msg.channel.id, new_sticky.id)
+
 
     @app_commands.command(description="Creates the New Character sticky in a channel")
     async def new_char_sticky(self, interaction: discord.Interaction) -> None:
@@ -62,8 +62,7 @@ class StickyHandler(commands.Cog):
             STICKY_CHANNELS.append(interaction.channel.id)
             await interaction.response.send_message(f"Sticky created in channel: {interaction.channel.name}", ephemeral=True)
 
-    # command to remove a new character sticky in a specific channel and the db
-    # (/unsubscribe_new_char_sticky), should be locked to admin role
+
     @app_commands.command(description="Removes the New Character sticky from a channel")
     @app_commands.describe(del_sticky="Should the old sticky message be removed?")
     async def unsubscribe_new_char_sticky(self, interaction: discord.Interaction, del_sticky: Optional[bool] = False) -> None:

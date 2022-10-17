@@ -154,7 +154,6 @@ def get_quest(quest_id: int) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    print(query_return)
     quest = []
     if query_return:
         quest = QuestInfo(*query_return[1:])
