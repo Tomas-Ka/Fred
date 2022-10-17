@@ -64,7 +64,7 @@ def _execute_query(connection: Connection, query: str, vars: Tuple) -> None:
     try:
         cursor.execute(query, vars)
         connection.commit()
-        print("Query executed successfully")
+        # print("Query executed successfully")
     except Error as e:
         print(f"The error '{e}' occurred")
 
@@ -130,7 +130,7 @@ def get_quest_by_title(quest_title) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    if quest:
+    if query_return:
         quest = QuestInfo(*query_return[1:])
     return quest
 
@@ -154,7 +154,9 @@ def get_quest(quest_id: int) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    if quest:
+    print(query_return)
+    quest = []
+    if query_return:
         quest = QuestInfo(*query_return[1:])
     return quest
 
@@ -172,7 +174,7 @@ def get_quest_list() -> List[QuestInfo]:
 
     query_return = _execute_multiple_read_query(connection, quest_querty)
     quests = []
-    if quests:
+    if query_return:
         for quest in query_return:
             quests.append(QuestInfo(*quest[1:]))
     return quests
@@ -219,16 +221,15 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
     """
     quest_update = f"""
     UPDATE quests
-    SET (
-        quest_title = ?
-        contractor = ?
-        description = ?
-        reward = ?
-        embed_colour = ?
-        thread_id = ?
-        quest_role_id = ?
+    SET
+        quest_title = ?,
+        contractor = ?,
+        description = ?,
+        reward = ?,
+        embed_colour = ?,
+        thread_id = ?,
+        quest_role_id = ?,
         pin_message_id = ?
-        )
     WHERE
         id = ?
     """
@@ -277,10 +278,10 @@ def get_sticky(channel_id: int) -> int:
     """
     sticky_query = f"""
     SELECT * FROM stickies
-    WHERE id = ?"""
+    WHERE channel_id = ?"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    return _execute_read_query(connection, sticky_query, (channel_id,))
+    return _execute_read_query(connection, sticky_query, (channel_id,))[1]
 
 
 def get_sticky_list() -> List[int]:
@@ -322,7 +323,7 @@ def update_sticky(channel_id: int, message_id: int) -> None:
     SET
         message_id = ?
     WHERE
-        id = ?
+        channel_id = ?
     """
     _execute_query(connection, sticky_update, (message_id, channel_id,))
 
@@ -333,7 +334,7 @@ def del_sticky(channel_id: int):
     Args:
         channel_id (int): The Id of the channel to remove the sticky from
     """
-    sticky_del = f"DELETE FROM stickies WHERE id = ?"
+    sticky_del = f"DELETE FROM stickies WHERE channel_id = ?"
     _execute_query(connection, sticky_del, (channel_id,))
 
 

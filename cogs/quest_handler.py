@@ -167,7 +167,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
         self.reward.default = self.quest_info.reward
-        self.embed_colour.default = self.quest_info.embed_colour
+        self.embed_colour.default = webcolors.hex_to_name(self.quest_info.embed_colour)
 
     quest_title = discord.ui.TextInput(
         label="Quest title",
@@ -233,9 +233,10 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           self.embed_colour.value,
                           thread_id,
                           quest_role_id,
-                          self.quest_info.player_message,
                           self.quest_info.pin_message_id,
-                          self.quest_info.players)
+                          self.quest_info.player_message
+                          )
+        quest.players = self.quest_info.players
         db.update_quest(self.message.id, quest)
         await self.message.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()

@@ -98,9 +98,9 @@ async def setup(bot: commands.Bot) -> None:
 
     STICKY_CHANNELS = db.get_sticky_list()
     print("\t\tLoaded stickies in channels:")
-    for channel_id in STICKY_CHANNELS:
-        print(f"\t\t\t{bot.get_channel(channel_id).name}")
+    for pair in STICKY_CHANNELS:
+        print(f"\t\t\t{pair[0]}")
     if not STICKY_CHANNELS:
-        print("\t\t\tNo stickies to load")
+        print("\t\t\tNo stickies in database")
 
     await bot.add_cog(StickyHandler(bot))
