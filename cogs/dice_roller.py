@@ -126,5 +126,5 @@ class DiceRoller(commands.Cog):
 # this setup is required for the cog to setup and run.
 # this is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
-    print("\tcogs-dice_roller begin loading")
+    print("\tcogs.dice_roller begin loading")
     await bot.add_cog(DiceRoller(bot))

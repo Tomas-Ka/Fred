@@ -1,7 +1,7 @@
 import sqlite3
 from sqlite3 import Connection, Error
 from typing import List, Tuple
-from cogs.quest_handler import QuestInfo
+from helpers import QuestInfo
 
 
 def _create_connection(path) -> Connection:
@@ -172,7 +172,7 @@ def get_quest_list() -> List[QuestInfo]:
 
     query_return = _execute_multiple_read_query(connection, quest_querty)
     quests = []
-    if quest:
+    if quests:
         for quest in query_return:
             quests.append(QuestInfo(*quest[1:]))
     return quests
@@ -342,7 +342,7 @@ connection = _create_connection("db.sqlite")
 
 
 if __name__ == "__main__":
-    _create_tables()
+    #_create_tables()
 
     # This is all setup for migrating from the old .dat system, and will be removed once the migration is over
     # TODO
