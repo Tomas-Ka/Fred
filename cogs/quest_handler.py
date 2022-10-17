@@ -2,14 +2,11 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-# pickle is for storing and retrieving data
-import pickle
 # traceback is for error logging
 import traceback
 # webcolors is needed to take colour names and make them into a hex value
 # discord.py can work with
 import webcolors
-
 import json
 import db_handler as db
 
@@ -33,7 +30,8 @@ class QuestInfo():
             embed_colour: str,
             thread_id: int,
             quest_role_id: int,
-            message: discord.Message,
+            player_message: discord.Message,
+            pin_message_id: int,
             players: str = None) -> None:
         self.quest_title = quest_title
         self.contractor = contractor
@@ -42,9 +40,10 @@ class QuestInfo():
         self.embed_colour = embed_colour
         self.thread_id = thread_id
         self.quest_role_id = quest_role_id
-        self.player_message = message
+        self.player_message = player_message
+        self.pin_message_id = pin_message_id
         if players is not None:
-            self.players = json.load(players)
+            self.players = json.loads(players)
         else:
             self.players = []
 
@@ -173,11 +172,10 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
 
         # send the player amount message in the thread and pin it
-        message: discord.Message = await thread.send(embed=discord.Embed(title="Players:", color=discord.Color.from_str(embed_colour)))
-        await message.pin()
+        pin_message: discord.Message = await thread.send(embed=discord.Embed(title="Players:", color=discord.Color.from_str(embed_colour)))
+        await pin_message.pin()
 
         # update the QuestInfo in memory
-
         quest = QuestInfo(self.quest_title.value,
                           self.contractor.value,
                           self.description.value,
@@ -185,7 +183,8 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
                           embed_colour,
                           thread.id,
                           quest_role.id,
-                          message)
+                          pin_message,
+                          pin_message.id)
 
         db.create_quest(msg.id, quest)
 
@@ -276,7 +275,9 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           self.embed_colour.value,
                           thread_id,
                           quest_role_id,
-                          self.quest_info.player_message)
+                          self.quest_info.player_message,
+                          self.quest_info.pin_message_id,
+                          self.quest_info.players)
         db.update_quest(self.message.id, quest)
         await self.message.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
