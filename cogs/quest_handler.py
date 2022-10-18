@@ -2,6 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+import discord.utils
 # traceback is for error logging
 import traceback
 # webcolors is needed to take colour names and make them into a hex value
@@ -38,8 +39,9 @@ class PersistentQuestJoinView(discord.ui.View):
     # The callback function for self.join_button, it is added where the Button
     # is defined
     async def quest_join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        dm_role = discord.utils.get(interaction.guild.roles, name="Dm")
+        
         # get thread and role of quest
-
         role = interaction.guild.get_role(self.info.quest_role_id)
         thread = interaction.guild.get_thread(self.info.thread_id)
         # check if user has the quest role
@@ -49,22 +51,23 @@ class PersistentQuestJoinView(discord.ui.View):
             await thread.remove_user(interaction.user)
             await interaction.response.defer()
             # if the user isn't a dm remove them from the player list
-            if "Dm" not in interaction.user.roles:
-                self.info.remove_player(interaction.user.id)
+            if dm_role in interaction.user.roles:
+                return
+            self.info.remove_player(interaction.user.id)
         else:
             # if user doesn't have role, add it and add user to the thread
             await interaction.user.add_roles(role)
             await thread.add_user(interaction.user)
             await interaction.response.defer()
             # if the user isn't a dm, add them to the player list
-            if "Dm" not in interaction.user.roles:
-                self.info.add_player(interaction.user.id)
+            if dm_role in interaction.user.roles:
+                return
+            self.info.add_player(interaction.user.id)
         namestring = ""
         for player_id in self.info._players:
             name = interaction.guild.get_member(player_id).display_name
             namestring += name + "\n"
         await interaction.channel.get_thread(self.info.thread_id).get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
-        # TODO: Write changes to the player var to db
         db.update_quest(self.quest_id, self.info)
 
 
