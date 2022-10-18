@@ -20,6 +20,7 @@ FILE_LOCATION = "."
 class PersistentQuestJoinView(discord.ui.View):
     # View for the join quest button
     def __init__(self, info: QuestInfo, disabled: bool = False) -> None:
+        self.quest_id = db.get_quest_by_title(info.quest_title)[0]
         self.info = info
         # create the button here since I need access to self.info for the
         # custom_id.
@@ -49,7 +50,7 @@ class PersistentQuestJoinView(discord.ui.View):
             await interaction.response.defer()
             # if the user isn't a dm remove them from the player list
             if "Dm" not in interaction.user.roles:
-                self.info.remove_player(interaction.user)
+                self.info.remove_player(interaction.user.id)
         else:
             # if user doesn't have role, add it and add user to the thread
             await interaction.user.add_roles(role)
@@ -57,12 +58,14 @@ class PersistentQuestJoinView(discord.ui.View):
             await interaction.response.defer()
             # if the user isn't a dm, add them to the player list
             if "Dm" not in interaction.user.roles:
-                self.info.add_player(interaction.user)
+                self.info.add_player(interaction.user.id)
         namestring = ""
-        for player in self.info._players:
-            namestring += player.display_name + "\n"
-        await self.info.player_message.edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
-
+        for player_id in self.info._players:
+            name = interaction.guild.get_member(player_id).display_name
+            namestring += name + "\n"
+        await interaction.channel.get_thread(self.info.thread_id).get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
+        # TODO: Write changes to the player var to db
+        db.update_quest(self.quest_id, self.info)
 
 
 # ------------------------MODALS--------------------------
@@ -141,7 +144,6 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
                           embed_colour,
                           thread.id,
                           quest_role.id,
-                          pin_message,
                           pin_message.id)
 
         db.create_quest(msg.id, quest)
@@ -167,7 +169,8 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
         self.reward.default = self.quest_info.reward
-        self.embed_colour.default = webcolors.hex_to_name(self.quest_info.embed_colour)
+        self.embed_colour.default = webcolors.hex_to_name(
+            self.quest_info.embed_colour)
 
     quest_title = discord.ui.TextInput(
         label="Quest title",
@@ -233,7 +236,6 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           thread_id,
                           quest_role_id,
                           self.quest_info.pin_message_id,
-                          self.quest_info.player_message,
                           self.quest_info.players
                           )
         db.update_quest(self.message.id, quest)
@@ -312,7 +314,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         else:
             # Lock the quest
             await interaction.guild.get_thread(self.quest_info.thread_id).edit(locked=True, archived=True)
-        
+
         #del role
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
 

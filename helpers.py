@@ -16,7 +16,6 @@ class QuestInfo():
             embed_colour: str,
             thread_id: int,
             quest_role_id: int,
-            player_message: discord.Message,
             pin_message_id: int,
             players: str = None) -> None:
         self.quest_title = quest_title
@@ -26,7 +25,6 @@ class QuestInfo():
         self.embed_colour = embed_colour
         self.thread_id = thread_id
         self.quest_role_id = quest_role_id
-        self.player_message = player_message
         self.pin_message_id = pin_message_id
         if players is not None:
             self._players = json.loads(players)
@@ -37,10 +35,10 @@ class QuestInfo():
     def players(self) -> str:
         return json.dumps(self._players)
 
-    # adds a player (in the form of a member object) to the list
-    def add_player(self, member: discord.Member) -> None:
+    # adds a player (in the form of a their id) to the list
+    def add_player(self, member: int) -> None:
         self._players.append(member)
 
-    # removes a player (as a member object) from the list
-    def remove_player(self, member: discord.Member) -> None:
+    # removes a player (in the form of a their id) from the list
+    def remove_player(self, member: int) -> None:
         self._players.remove(member)

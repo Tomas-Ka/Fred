@@ -21,6 +21,8 @@ class WhaleHandler(commands.Cog):
                 await msg.add_reaction("👀")
                 self.time = time()
 
+
+# ----------------------MAIN PROGRAM----------------------
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:

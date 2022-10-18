@@ -18,7 +18,6 @@ class StickyHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
         # this is only for the character sticky messages
@@ -38,7 +37,6 @@ class StickyHandler(commands.Cog):
         # proces the data of the sticky (update references and the like), and
         # write the changes to disk.
         db.update_sticky(msg.channel.id, new_sticky.id)
-
 
     @app_commands.command(description="Creates the New Character sticky in a channel")
     async def new_char_sticky(self, interaction: discord.Interaction) -> None:
@@ -61,7 +59,6 @@ class StickyHandler(commands.Cog):
             db.create_sticky(interaction.channel.id, new_sticky.id)
             STICKY_CHANNELS.append(interaction.channel.id)
             await interaction.response.send_message(f"Sticky created in channel: {interaction.channel.name}", ephemeral=True)
-
 
     @app_commands.command(description="Removes the New Character sticky from a channel")
     @app_commands.describe(del_sticky="Should the old sticky message be removed?")

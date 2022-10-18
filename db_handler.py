@@ -121,7 +121,7 @@ def get_quest_by_title(quest_title) -> QuestInfo:
     Returns:
         QuestInfo: An object containing the data from the db.
     """
-    quest_query = f"""
+    quest_query = """
     SELECT * FROM quests
     WHERE quest_title = ?"""
     # This returns a list and we take the first object as there should only
@@ -144,7 +144,7 @@ def get_quest(quest_id: int) -> QuestInfo:
     Returns:
         QuestInfo: An object containing the data from the db.
     """
-    quest_query = f"""
+    quest_query = """
     SELECT * FROM quests
     WHERE id = ?;"""
 
@@ -154,10 +154,36 @@ def get_quest(quest_id: int) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    quest = []
+    quest = None
     if query_return:
         quest = QuestInfo(*query_return[1:])
     return quest
+
+
+def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
+    """Returns a tuple containing the quest id
+    and a questInfo object, given a quest title.
+
+    Args:
+        quest_id (int): The quest name to get from the database.
+
+    Returns:
+        Tuple[int, QuestInfo]: An object containing the data from the db.
+    """
+    quest_query = """
+    SELECT * FROM quests
+    WHERE quest_title = ?;"""
+
+    # This returns a list and we take the first object as there should only
+    # ever be one due to unique constraints in the db
+    query_return = _execute_read_query(connection, quest_query, (quest_title,))
+
+    # The first value returned is the id of the quest, which we don't want to
+    # parse
+    quest = []
+    if query_return:
+        quest = QuestInfo(*query_return[1:])
+    return (query_return[0], quest)
 
 
 def get_quest_list() -> List[QuestInfo]:
@@ -167,7 +193,7 @@ def get_quest_list() -> List[QuestInfo]:
         List[QuestInfo]: The list of objects
     """
 
-    quest_querty = f"""
+    quest_querty = """
     SELECT * FROM quests;
     """
 
@@ -186,7 +212,7 @@ def create_quest(id: int, quest_info: QuestInfo) -> None:
         id (int): The message id the quest is linked to in both the database, and discord.
         quest_info (QuestInfo): The information to store in the database.
     """
-    quest_add = f"""
+    quest_add = """
     INSERT INTO
         quests (
         id, quest_title, contractor,
@@ -218,7 +244,7 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
         id (int): The id of the quest to update.
         quest_info (QuestInfo): The info to update the quest with.
     """
-    quest_update = f"""
+    quest_update = """
     UPDATE quests
     SET
         quest_title = ?,
@@ -277,7 +303,7 @@ def get_sticky(channel_id: int) -> int:
     Returns:
         int: The id if the sticky message itself.
     """
-    sticky_query = f"""
+    sticky_query = """
     SELECT * FROM stickies
     WHERE channel_id = ?"""
     # This returns a list and we take the first object as there should only
@@ -291,7 +317,7 @@ def get_sticky_list() -> List[int]:
     Returns:
         List[int]: A list of ids for the channels the stickies are in.
     """
-    sticky_query = f"""
+    sticky_query = """
     SELECT * FROM stickies"""
     return _execute_multiple_read_query(connection, sticky_query)
 
@@ -303,7 +329,7 @@ def create_sticky(channel_id: int, message_id: int) -> None:
         channel_id (int): The discord Channel id of the message.
         message_id (int): The id of the message itself.
     """
-    sticky_add = f"""
+    sticky_add = """
     INSERT INTO
         stickies (channel_id, message_id)
     VALUES
@@ -319,7 +345,7 @@ def update_sticky(channel_id: int, message_id: int) -> None:
         channel_id (int): The id of the discord channel the sticky is in.
         message_id (int): The id of the new sticky.
     """
-    sticky_update = f"""
+    sticky_update = """
     UPDATE stickies
     SET
         message_id = ?
@@ -344,7 +370,7 @@ connection = _create_connection("db.sqlite")
 
 
 if __name__ == "__main__":
-    #_create_tables()
+    # _create_tables()
 
     # This is all setup for migrating from the old .dat system, and will be removed once the migration is over
     # TODO
