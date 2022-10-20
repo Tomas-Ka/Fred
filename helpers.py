@@ -41,4 +41,8 @@ class QuestInfo():
 
     # removes a player (in the form of a their id) from the list
     def remove_player(self, member: int) -> None:
-        self._players.remove(member)
+        try:
+            self._players.remove(member)
+        except ValueError:
+            print(f"can't remove player with id {member} from quest {quest_title} as they don't exist in the list")
+
