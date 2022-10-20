@@ -50,6 +50,13 @@ def _create_tables() -> None:
     );
     """
     _execute_query(connection, create_stickies_table, ())
+    
+    create_players_table = """
+    CREATE TABLE IF NOT EXISTS players (
+        "player_id" INTEGER UNIQUE,
+        "quests_completed" INTEGER
+    );
+    """
 
 
 def _execute_query(connection: Connection, query: str, vars: Tuple) -> None:
@@ -370,43 +377,4 @@ connection = _create_connection("db.sqlite")
 
 
 if __name__ == "__main__":
-    # _create_tables()
-
-    # This is all setup for migrating from the old .dat system, and will be removed once the migration is over
-    # TODO
-    if (input("connect to discord and send pin messages?") == "y"):
-        import main
-        from main import bot
-        from dotenv import load_dotenv
-        from os import environ
-        import pickle
-        import asyncio
-        from cogs.quest_handler import QuestInfo
-        import db_handler as db
-
-        load_dotenv()
-        token = environ["TOKEN"]
-
-        @bot.listen()
-        async def on_ready():
-            with open(f'QUESTS.dat', 'rb') as quests:
-                QUESTS = pickle.load(quests)
-            await bot.wait_until_ready()
-            for id in QUESTS:
-                obj: QuestInfo = QUESTS[id]
-                print(obj.quest_title)
-                print(obj.thread_id)
-                if obj.quest_title == "aa" or obj.thread_id == 1019875727824396290:
-                    print("skipping")
-                    continue
-                print("------------------------")
-                print(bot.get_channel(1002356135816343632))
-                print(obj.thread_id)
-                print(
-                    bot.get_channel(1002356135816343632).get_thread(
-                        obj.thread_id))
-                message = await bot.get_channel(1002356135816343632).get_thread(obj.thread_id).send(content="This is a temp pin that should be changed soon")
-                await bot.get_channel(1002356135816343632).get_thread(obj.thread_id).get_partial_message(message.id).pin()
-                obj.pin_message_id = message.id
-                db.add_quest(obj)
-        bot.run(token)
+    _create_tables()

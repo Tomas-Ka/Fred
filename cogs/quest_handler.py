@@ -40,7 +40,7 @@ class PersistentQuestJoinView(discord.ui.View):
     # is defined
     async def quest_join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         dm_role = discord.utils.get(interaction.guild.roles, name="Dm")
-        
+
         # get thread and role of quest
         role = interaction.guild.get_role(self.info.quest_role_id)
         thread = interaction.guild.get_thread(self.info.thread_id)
