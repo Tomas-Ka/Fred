@@ -1,7 +1,5 @@
 from discord.ext import commands
-from discord import app_commands
 import discord
-from random import randint
 from time import time
 
 
@@ -24,6 +22,9 @@ class WhaleHandler(commands.Cog):
                 self.time = time()
 
 
+# ----------------------MAIN PROGRAM----------------------
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.whale_handler begin loading")
     await bot.add_cog(WhaleHandler(bot))
