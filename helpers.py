@@ -1,7 +1,4 @@
 import json
-import discord
-
-# TODO: Make player_message an id instead of a discord.Message object.
 
 
 class QuestInfo():

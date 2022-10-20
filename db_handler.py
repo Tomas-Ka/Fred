@@ -50,7 +50,7 @@ def _create_tables() -> None:
     );
     """
     _execute_query(connection, create_stickies_table, ())
-    
+
     create_players_table = """
     CREATE TABLE IF NOT EXISTS players (
         "player_id" INTEGER UNIQUE,
