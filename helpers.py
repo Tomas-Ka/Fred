@@ -44,5 +44,5 @@ class QuestInfo():
         try:
             self._players.remove(member)
         except ValueError:
-            print(f"can't remove player with id {member} from quest {quest_title} as they don't exist in the list")
-
+            print(
+                f"can't remove player with id {member} from quest {quest_title} as they don't exist in the list")
