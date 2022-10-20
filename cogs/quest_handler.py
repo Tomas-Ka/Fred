@@ -2,67 +2,26 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-# pickle is for storing and retrieving data
-import pickle
+import discord.utils
 # traceback is for error logging
 import traceback
 # webcolors is needed to take colour names and make them into a hex value
-# discord.py can work with
 import webcolors
+import db_handler as db
+from helpers import QuestInfo
 
-import json
 
 # -----------------------STATIC VARS----------------------
-QUESTS = {}
 # VS Code is annoying and runs the code in the home directory. This shouldn't be requred once I actually run the code as a standalone
 # Then I should just change this to "."
 FILE_LOCATION = "."
-
-
-# ---------------------HOLDER CLASSES---------------------
-class QuestInfo():
-    # This is just a blank class so I more easily can pass Quest data between
-    # objects
-    def __init__(
-            self,
-            quest_title: str,
-            contractor: str,
-            description: str,
-            reward: str,
-            embed_colour: str,
-            thread_id: int,
-            quest_role_id: int,
-            message: discord.Message,
-            players: str = None) -> None:
-        self.quest_title = quest_title
-        self.contractor = contractor
-        self.description = description
-        self.reward = reward
-        self.embed_colour = embed_colour
-        self.thread_id = thread_id
-        self.quest_role_id = quest_role_id
-        self.player_message = message
-        if players != None:
-            self.players = json.load(players)
-        else:
-            self.players = []
-    
-    #adds a player (in the form of a member object) to the list
-    def add_player(self, member: discord.Member) -> None:
-        self.players.append(member)
-    
-    #removes a player (as a member object) from the list
-    def remove_player(self, member: discord.Member) -> None:
-        self.players.remove(member)
-        
-    def get_players_json(self) -> str:
-        return json.dumps(self._players)
 
 
 # ---------.----------PERSISTENT VIEWS--------------------
 class PersistentQuestJoinView(discord.ui.View):
     # View for the join quest button
     def __init__(self, info: QuestInfo, disabled: bool = False) -> None:
+        self.quest_id = db.get_quest_by_title(info.quest_title)[0]
         self.info = info
         # create the button here since I need access to self.info for the
         # custom_id.
@@ -80,8 +39,9 @@ class PersistentQuestJoinView(discord.ui.View):
     # The callback function for self.join_button, it is added where the Button
     # is defined
     async def quest_join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        dm_role = discord.utils.get(interaction.guild.roles, name="Dm")
+        
         # get thread and role of quest
-
         role = interaction.guild.get_role(self.info.quest_role_id)
         thread = interaction.guild.get_thread(self.info.thread_id)
         # check if user has the quest role
@@ -91,21 +51,25 @@ class PersistentQuestJoinView(discord.ui.View):
             await thread.remove_user(interaction.user)
             await interaction.response.defer()
             # if the user isn't a dm remove them from the player list
-            if not "Dm" in interaction.user.roles:
-                self.info.remove_player(interaction.user)
+            if dm_role in interaction.user.roles:
+                return
+            self.info.remove_player(interaction.user.id)
         else:
             # if user doesn't have role, add it and add user to the thread
             await interaction.user.add_roles(role)
             await thread.add_user(interaction.user)
             await interaction.response.defer()
             # if the user isn't a dm, add them to the player list
-            if not "Dm" in interaction.user.roles:
-                self.info.add_player(interaction.user)
+            if dm_role in interaction.user.roles:
+                return
+            self.info.add_player(interaction.user.id)
         namestring = ""
-        for player in self.info.players:
-            namestring += player.display_name + "\n"
-        await self.info.player_message.edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
-    
+        for player_id in self.info._players:
+            name = interaction.guild.get_member(player_id).display_name
+            namestring += name + "\n"
+        await interaction.channel.get_thread(self.info.thread_id).get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
+        db.update_quest(self.quest_id, self.info)
+
 
 # ------------------------MODALS--------------------------
 class CreateQuest(discord.ui.Modal, title="Create Quest"):
@@ -146,12 +110,12 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
             # error handling for misspellt or non-existing colour name
             await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
             return
-    
+
         embed = discord.Embed(
             title=self.quest_title.value,
             description=self.description.value,
             color=discord.Color.from_str(
-                    embed_colour))
+                embed_colour))
         embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.avatar.url)
@@ -164,27 +128,31 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
         # create the quest role with the name of the quest title
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
+
         # send the actual message with the quest info
         msg = await interaction.channel.send(embed=embed)
+
         # create & attatch the thread to the newly created quest info message
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
-        # send the player amount message in the thread and pin it
-        message: discord.Message = await thread.send(embed=discord.Embed(title="Players:", color=discord.Color.from_str(embed_colour)))
-        await message.pin()
-        # update the QuestInfo in memory
-        QUESTS[msg.id] = QuestInfo(self.quest_title.value,
-                                   self.contractor.value,
-                                   self.description.value,
-                                   self.reward.value,
-                                   embed_colour,
-                                   thread.id,
-                                   quest_role.id,
-                                   message)
 
-        write_quests()
+        # send the player amount message in the thread and pin it
+        pin_message: discord.Message = await thread.send(embed=discord.Embed(title="Players:", color=discord.Color.from_str(embed_colour)))
+        await pin_message.pin()
+
+        # update the QuestInfo in memory
+        quest = QuestInfo(self.quest_title.value,
+                          self.contractor.value,
+                          self.description.value,
+                          self.reward.value,
+                          embed_colour,
+                          thread.id,
+                          quest_role.id,
+                          pin_message.id)
+
+        db.create_quest(msg.id, quest)
 
         # set the quest join button into the quest info message
-        await msg.edit(view=PersistentQuestJoinView(QUESTS[msg.id]))
+        await msg.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -199,12 +167,13 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
     def __init__(self, message: discord.Message) -> None:
         super().__init__()
         self.message = message
-        self.quest_info: QuestInfo = QUESTS[self.message.id]
+        self.quest_info: QuestInfo = db.get_quest(self.message.id)
         self.quest_title.default = self.quest_info.quest_title
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
         self.reward.default = self.quest_info.reward
-        self.embed_colour.default = self.quest_info.embed_colour
+        self.embed_colour.default = webcolors.hex_to_name(
+            self.quest_info.embed_colour)
 
     quest_title = discord.ui.TextInput(
         label="Quest title",
@@ -238,16 +207,15 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         quest_role_id = self.quest_info.quest_role_id
 
         try:
-            embed = discord.Embed(
-                title=self.quest_title.value,
-                description=self.description.value,
-                color=discord.Color.from_str(
-                    webcolors.name_to_hex(
-                        self.embed_colour.value)))
+            self.embed_colour = webcolors.name_to_hex(self.embed_colour.value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
             await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
             return
+        embed = discord.Embed(
+            title=self.quest_title.value,
+            description=self.description.value,
+            color=discord.Color.from_str(self.embed_colour))
         embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.avatar.url)
@@ -258,21 +226,23 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
         #embed.set_footer(text="I have no clue what to put here")
         await self.message.edit(embed=embed)
+
         # edit thread and role names
         await self.message.channel.get_thread(thread_id).edit(name=self.quest_title.value)
         await self.message.guild.get_role(quest_role_id).edit(name=self.quest_title.value)
 
-        # update the QuestInfo in memory
-        QUESTS[self.message.id] = QuestInfo(self.quest_title.value,
-                                            self.contractor.value,
-                                            self.description.value,
-                                            self.reward.value,
-                                            self.embed_colour.value,
-                                            thread_id,
-                                            quest_role_id,
-                                            self.quest_info.player_message)
-        write_quests()
-        await self.message.edit(view=PersistentQuestJoinView(QUESTS[self.message.id]))
+        quest = QuestInfo(self.quest_title.value,
+                          self.contractor.value,
+                          self.description.value,
+                          self.reward.value,
+                          self.embed_colour,
+                          thread_id,
+                          quest_role_id,
+                          self.quest_info.pin_message_id,
+                          self.quest_info.players
+                          )
+        db.update_quest(self.message.id, quest)
+        await self.message.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -287,7 +257,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
     def __init__(self, message: discord.Message) -> None:
         super().__init__()
         self.message = message
-        self.quest_info: QuestInfo = QUESTS[self.message.id]
+        self.quest_info: QuestInfo = db.get_quest(self.message.id)
         if len(self.quest_info.quest_title) < 16:
             self.title = f"Delete Quest {self.quest_info.quest_title}"
             self.confirmation.label = f'Type questname: "{self.quest_info.quest_title}" to confirm'
@@ -336,7 +306,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # otherwise, disable the join quest button
         else:
             disabled_view = PersistentQuestJoinView(
-                QUESTS[self.message.id], disabled=True)
+                self.quest_info, disabled=True)
             await self.message.edit(view=disabled_view)
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
@@ -345,17 +315,14 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         if self.thread_del_flag.value.lower() == "yes":
             await interaction.guild.get_thread(self.quest_info.thread_id).delete()
         else:
+            # Lock the quest
             await interaction.guild.get_thread(self.quest_info.thread_id).edit(locked=True, archived=True)
-            print("locked")
 
         #del role
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
 
-        # del memory storage
-        del QUESTS[self.message.id]
-
-        # update storage
-        write_quests()
+        #del quest
+        db.del_quest(self.message.id)
 
         await interaction.response.send_message(f"Quest {self.quest_info.quest_title} removed!", ephemeral=True)
 
@@ -365,15 +332,9 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
 
-
-# -----------------------FUNCTIONS------------------------
-def write_quests() -> None:
-    with open(f'{FILE_LOCATION}/QUESTS.dat', 'wb') as quests:
-        pickle.dump(QUESTS, quests)
-        quests.truncate()
-
-
 # -----------------------MAIN CLASS-----------------------
+
+
 class QuestHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -387,7 +348,6 @@ class QuestHandler(commands.Cog):
 
     # command to create a new quest (/create_quest), should be locked to DM
     # role
-
     @app_commands.command(description="Make a Quest")
     async def create_quest(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_modal(CreateQuest())
@@ -404,23 +364,17 @@ class QuestHandler(commands.Cog):
 
 
 # ----------------------MAIN PROGRAM----------------------
-# this setup is required for the cog to setup and run.
-# this is run when the cog is loaded with bot.load_extensions()
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
-    global QUESTS
 
-    # load in the data and set it up in the global var
-    with open(f'{FILE_LOCATION}/QUESTS.dat', 'rb') as quests:
-        QUESTS = pickle.load(quests)
-
-    # load quests
-    if not QUESTS == {}:
-        print("\t\tLoading quests:")
-    else:
-        print("\t\tNo quests to load")
-    for quest in QUESTS:
-        bot.add_view(PersistentQuestJoinView(QUESTS[quest]))
-        print(f"\t\t\t{QUESTS[quest].quest_title}")
+    print("\t\tQuests in database:")
+    quests = db.get_quest_list()
+    for quest in quests:
+        bot.add_view(PersistentQuestJoinView(quest))
+        print(f"\t\t\t{quest.quest_title}")
+    if not quests:
+        print(f"\t\t\tNo quests in db!")
 
     await bot.add_cog(QuestHandler(bot))

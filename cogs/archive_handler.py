@@ -2,11 +2,6 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from typing import Optional
-# pickle is for storing and retrieving data
-import pickle
-# traceback is for error logging
-import traceback
 
 # -----------------------STATIC VARS----------------------
 ARCHIVE_ROLE = "Archive"
@@ -56,8 +51,8 @@ class ArchiveHandler(commands.Cog):
 
 
 # ------------------------MAIN CODE-----------------------
-# this setup is required for the cog to setup and run.
-# this is run when the cog is loaded with bot.load_extensions()
+# This setup is required for the cog to setup and run,
+# and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.archive_handler begin loading")
     bot.add_view(PersistentArchiveRoleView())
