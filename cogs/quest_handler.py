@@ -279,6 +279,13 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         default="no"
     )
 
+    complete_quest_flag = discord.ui.TextInput(
+        style=discord.TextStyle.short,
+        max_length=3,
+        label="Count as completed quest? (yes/no)",
+        default="yes"
+    )
+
     confirmation = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Retype quest name to confirm"
@@ -299,6 +306,11 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await interaction.response.send_message("Thread deletion flag has to be yes or no", ephemeral=True)
             return
 
+        if not self.complete_quest_flag.value.lower(
+        ) == "yes" and not self.thread_del_flag.value.lower() == "no":
+            await interaction.response.send_message("Quest completion flag has to be yes or no", ephemeral=True)
+            return
+
         # if we should delete the message, delete it
         if self.msg_del_flag.value.lower() == "yes":
             await self.message.delete()
@@ -311,12 +323,16 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
 
+        thread = interaction.guild.get_thread(self.quest_info.thread_id)
+        embed = await _send_quests_played(thread, self.quest_info, True)
+        await thread.send(embed=embed)
+
         # if we should delete the thread, do so
         if self.thread_del_flag.value.lower() == "yes":
-            await interaction.guild.get_thread(self.quest_info.thread_id).delete()
+            await thread.delete()
         else:
             # Lock the quest
-            await interaction.guild.get_thread(self.quest_info.thread_id).edit(locked=True, archived=True)
+            await thread.edit(locked=True, archived=True)
 
         #del role
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
@@ -352,6 +368,13 @@ class QuestHandler(commands.Cog):
     async def create_quest(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_modal(CreateQuest())
 
+    # command to get how many quests players in a channel have played.
+    @app_commands.command(
+        description="Get amount of quests played for all users in the channel")
+    async def get_quests_played(self, interaction: discord.Interaction) -> None:
+        embed = await _send_quests_played(interaction.channel)
+        await interaction.response.send_message(embed=embed)
+
     # command to edit a quest (right click and edit quest), should be locked
     # to DM role
     async def edit_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
@@ -363,9 +386,41 @@ class QuestHandler(commands.Cog):
         await interaction.response.send_modal(DelQuest(message))
 
 
+# ---------------------OTHER FUNCTIONS--------------------
+# TODO; needs docstring
+async def _send_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+    player_role = discord.utils.get(channel.guild.roles, name="Player")
+    players = {}
+    namestring = ""
+    if channel is discord.Thread:
+        members_in_channel = await channel.fetch_members()
+    else:
+        members_in_channel = channel.members
+    for player in members_in_channel:
+        player = channel.guild.get_member(player.id)
+        if player_role not in player.roles:
+            continue
+        if increment:
+            quests_played = db.get_player(player.id) + 1
+        else:
+            quests_played = db.get_player(player.id)
+        players[player] = quests_played
+        db.update_player(player.id, quests_played)
+        namestring += f"{player.display_name}: {quests_played}\n"
+    if quest_info is None:
+        embed_colour = "#ffffff"
+    else:
+        embed_colour = quest_info.embed_colour
+    return discord.Embed(
+        title="Quests Played:",
+        description=namestring,
+        color=discord.Color.from_str(embed_colour))
+
 # ----------------------MAIN PROGRAM----------------------
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions()
+
+
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
 
