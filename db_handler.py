@@ -377,7 +377,15 @@ def del_sticky(channel_id: int):
 
 
 def get_player(player_id: int) -> int:
+    """Gets a player and the amount of quests they've run, and if they aren't
+    in the db, initialize them with 0 quests made.
 
+    Args:
+        player_id (int): The id of the player to check.
+
+    Returns:
+        int: The amount of quests that player has run.
+    """
     player_query = """
     SELECT quests_completed FROM players
     WHERE player_id = ?;"""
@@ -398,10 +406,14 @@ def get_player(player_id: int) -> int:
         return 0
     return query_return[0]
 
-# TODO; needs docstring
-
 
 def update_player(player_id: int, quests_completed: int) -> None:
+    """Sets an entry in the db to a specific value.
+
+    Args:
+        player_id (int): The player id of the row that should be updated.
+        quests_completed (int): The amount of completed quests that should be entered.
+    """
     player_update = """
         UPDATE players
         SET

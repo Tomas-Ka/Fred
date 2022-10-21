@@ -324,7 +324,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             disabled_view.stop()
 
         thread = interaction.guild.get_thread(self.quest_info.thread_id)
-        embed = await _send_quests_played(thread, self.quest_info, True)
+        embed = await _get_quests_played(thread, self.quest_info, True)
         await thread.send(embed=embed)
 
         # if we should delete the thread, do so
@@ -348,9 +348,8 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
 
+
 # -----------------------MAIN CLASS-----------------------
-
-
 class QuestHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -368,11 +367,12 @@ class QuestHandler(commands.Cog):
     async def create_quest(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_modal(CreateQuest())
 
-    # command to get how many quests players in a channel have played.
+    # command to get how many quests players in a channel have played. Should
+    # also be locked to DM
     @app_commands.command(
         description="Get amount of quests played for all users in the channel")
     async def get_quests_played(self, interaction: discord.Interaction) -> None:
-        embed = await _send_quests_played(interaction.channel)
+        embed = await _get_quests_played(interaction.channel)
         await interaction.response.send_message(embed=embed)
 
     # command to edit a quest (right click and edit quest), should be locked
@@ -387,15 +387,33 @@ class QuestHandler(commands.Cog):
 
 
 # ---------------------OTHER FUNCTIONS--------------------
-# TODO; needs docstring
-async def _send_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+    """Returns an Embed containing all players in a channel, along with how many quests they've played.
+
+    Args:
+        channel (any discord channel): The channel to check for players in.
+        quest_info (QuestInfo, optional): Contains info about the quest, such as colour of the embed. Defaults to None.
+        increment (bool, optional): whether or not to increment the players quest count. Defaults to False.
+
+    Returns:
+        discord.Embed: An embed with all players in a channel along with how many quests they've played.
+    """
     player_role = discord.utils.get(channel.guild.roles, name="Player")
     players = {}
     namestring = ""
     if channel is discord.Thread:
+        # fetch_members is an api call to discord, which isn't great, but I
+        # couldn't find a better solution, and this *shouldn't* be too bad...
+        # Hopefully
         members_in_channel = await channel.fetch_members()
     else:
         members_in_channel = channel.members
+    if len(members_in_channel) > 20:
+        return discord.Embed(
+            title="Quests Played:",
+            description="Too many players in channel",
+            color=discord.Color.from_str("#ffffff")
+        )
     for player in members_in_channel:
         player = channel.guild.get_member(player.id)
         if player_role not in player.roles:
