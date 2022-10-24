@@ -357,9 +357,12 @@ class QuestHandler(commands.Cog):
             name="Edit Quest", callback=self.edit_quest)
         self.ctx_del_quest = app_commands.ContextMenu(
             name="Delete Quest", callback=self.del_quest)
+        self.ctx_get_quests_played = app_commands.ContextMenu(
+            name="Get quests played", callback=self.get_quests_played)
 
         self.bot.tree.add_command(self.ctx_edit_quest)
         self.bot.tree.add_command(self.ctx_del_quest)
+        self.bot.tree.add_command(self.ctx_get_quests_played)
 
     # command to create a new quest (/create_quest), should be locked to DM
     # role
@@ -371,9 +374,15 @@ class QuestHandler(commands.Cog):
     # also be locked to DM
     @app_commands.command(
         description="Get amount of quests played for all users in the channel")
-    async def get_quests_played(self, interaction: discord.Interaction) -> None:
+    async def get_all_quests_played(self, interaction: discord.Interaction) -> None:
         embed = await _get_quests_played(interaction.channel)
         await interaction.response.send_message(embed=embed)
+
+    # command to get the quests played by a specific user, doesn't have to be
+    # locked to DM role
+    async def get_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        quests = db.get_player(user.id)
+        await interaction.response.send_message(f"{user.display_name} has played {quests} quests")
 
     # command to edit a quest (right click and edit quest), should be locked
     # to DM role
@@ -389,6 +398,7 @@ class QuestHandler(commands.Cog):
 # ---------------------OTHER FUNCTIONS--------------------
 async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
+    THIS USES AN API CALL TO DISCORD, handle with care
 
     Args:
         channel (any discord channel): The channel to check for players in.
@@ -401,17 +411,37 @@ async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: b
     player_role = discord.utils.get(channel.guild.roles, name="Player")
     players = {}
     namestring = ""
-    if channel is discord.Thread:
-        # fetch_members is an api call to discord, which isn't great, but I
-        # couldn't find a better solution, and this *shouldn't* be too bad...
-        # Hopefully
-        members_in_channel = await channel.fetch_members()
+
+    # If we are passed a quest_info object we already have a list of players
+    # we can grab, and thus less api calls
+    if quest_info:
+        members_in_channel = []
+        player_list = quest_info._players
+
+        # Check so that we don't have over 20 players in the quest, which would
+        # warrant pure fear for other reasons, but eh
+        if len(player_lists) > 20:
+            return discord.Embed(
+                title="Quests Played:",
+                description="Too many players in channel (more than 20)",
+                color=discord.Color.from_str("#ffffff")
+            )
+
+        for player in player_list:
+            members_in_channel.append(channel.guild.get_member(player))
     else:
-        members_in_channel = channel.members
+        if channel is discord.Thread:
+            # fetch_members is an api call to discord, which isn't great, but I
+            # couldn't find a better solution, and this *shouldn't* be too bad...
+            # Hopefully
+            members_in_channel = await channel.fetch_members()
+        else:
+            members_in_channel = channel.members
+
     if len(members_in_channel) > 20:
         return discord.Embed(
             title="Quests Played:",
-            description="Too many players in channel",
+            description="Too many players in channel (more than 20)",
             color=discord.Color.from_str("#ffffff")
         )
     for player in members_in_channel:
@@ -420,10 +450,10 @@ async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: b
             continue
         if increment:
             quests_played = db.get_player(player.id) + 1
+            db.update_player(player_id, quests_played)
         else:
             quests_played = db.get_player(player.id)
         players[player] = quests_played
-        db.update_player(player.id, quests_played)
         namestring += f"{player.display_name}: {quests_played}\n"
     if quest_info is None:
         embed_colour = "#ffffff"
