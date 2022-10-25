@@ -279,6 +279,13 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         default="no"
     )
 
+    complete_quest_flag = discord.ui.TextInput(
+        style=discord.TextStyle.short,
+        max_length=3,
+        label="Count as completed quest? (yes/no)",
+        default="yes"
+    )
+
     confirmation = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Retype quest name to confirm"
@@ -299,6 +306,11 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await interaction.response.send_message("Thread deletion flag has to be yes or no", ephemeral=True)
             return
 
+        if not self.complete_quest_flag.value.lower(
+        ) == "yes" and not self.complete_quest_flag.value.lower() == "no":
+            await interaction.response.send_message("Quest completion flag has to be yes or no", ephemeral=True)
+            return
+
         # if we should delete the message, delete it
         if self.msg_del_flag.value.lower() == "yes":
             await self.message.delete()
@@ -311,12 +323,16 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
 
+        thread = interaction.guild.get_thread(self.quest_info.thread_id)
+        embed = await _get_quests_played(thread, self.quest_info, True)
+        await thread.send(embed=embed)
+
         # if we should delete the thread, do so
         if self.thread_del_flag.value.lower() == "yes":
-            await interaction.guild.get_thread(self.quest_info.thread_id).delete()
+            await thread.delete()
         else:
             # Lock the quest
-            await interaction.guild.get_thread(self.quest_info.thread_id).edit(locked=True, archived=True)
+            await thread.edit(locked=True, archived=True)
 
         #del role
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
@@ -332,9 +348,8 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
 
+
 # -----------------------MAIN CLASS-----------------------
-
-
 class QuestHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -342,15 +357,32 @@ class QuestHandler(commands.Cog):
             name="Edit Quest", callback=self.edit_quest)
         self.ctx_del_quest = app_commands.ContextMenu(
             name="Delete Quest", callback=self.del_quest)
+        self.ctx_get_quests_played = app_commands.ContextMenu(
+            name="Get quests played", callback=self.get_quests_played)
 
         self.bot.tree.add_command(self.ctx_edit_quest)
         self.bot.tree.add_command(self.ctx_del_quest)
+        self.bot.tree.add_command(self.ctx_get_quests_played)
 
     # command to create a new quest (/create_quest), should be locked to DM
     # role
     @app_commands.command(description="Make a Quest")
     async def create_quest(self, interaction: discord.Interaction) -> None:
         await interaction.response.send_modal(CreateQuest())
+
+    # command to get how many quests players in a channel have played. Should
+    # also be locked to DM
+    @app_commands.command(
+        description="Get amount of quests played for all users in the channel")
+    async def get_all_quests_played(self, interaction: discord.Interaction) -> None:
+        embed = await _get_quests_played(interaction.channel)
+        await interaction.response.send_message(embed=embed)
+
+    # command to get the quests played by a specific user, doesn't have to be
+    # locked to DM role
+    async def get_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        quests = db.get_player(user.id)
+        await interaction.response.send_message(f"{user.display_name} has played {quests} quests")
 
     # command to edit a quest (right click and edit quest), should be locked
     # to DM role
@@ -363,9 +395,81 @@ class QuestHandler(commands.Cog):
         await interaction.response.send_modal(DelQuest(message))
 
 
+# ---------------------OTHER FUNCTIONS--------------------
+async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+    """Returns an Embed containing all players in a channel, along with how many quests they've played.
+    THIS USES AN API CALL TO DISCORD, handle with care
+
+    Args:
+        channel (any discord channel): The channel to check for players in.
+        quest_info (QuestInfo, optional): Contains info about the quest, such as colour of the embed. Defaults to None.
+        increment (bool, optional): whether or not to increment the players quest count. Defaults to False.
+
+    Returns:
+        discord.Embed: An embed with all players in a channel along with how many quests they've played.
+    """
+    player_role = discord.utils.get(channel.guild.roles, name="Player")
+    players = {}
+    namestring = ""
+
+    # If we are passed a quest_info object we already have a list of players
+    # we can grab, and thus less api calls
+    if quest_info:
+        members_in_channel = []
+        player_list = quest_info._players
+
+        # Check so that we don't have over 20 players in the quest, which would
+        # warrant pure fear for other reasons, but eh
+        if len(player_list) > 20:
+            return discord.Embed(
+                title="Quests Played:",
+                description="Too many players in channel (more than 20)",
+                color=discord.Color.from_str("#ffffff")
+            )
+        for player in player_list:
+            members_in_channel.append(channel.guild.get_member(player))
+            
+    else:
+        if channel is discord.Thread:
+            # fetch_members is an api call to discord, which isn't great, but I
+            # couldn't find a better solution, and this *shouldn't* be too bad...
+            # Hopefully
+            members_in_channel = await channel.fetch_members()
+        else:
+            members_in_channel = channel.members
+
+    if len(members_in_channel) > 20:
+        return discord.Embed(
+            title="Quests Played:",
+            description="Too many players in channel (more than 20)",
+            color=discord.Color.from_str("#ffffff")
+        )
+    for player in members_in_channel:
+        player = channel.guild.get_member(player.id)
+        if player_role not in player.roles:
+            continue
+        if increment:
+            quests_played = db.get_player(player.id) + 1
+            db.update_player(player.id, quests_played)
+        else:
+            quests_played = db.get_player(player.id)
+        
+        players[player] = quests_played
+        namestring += f"{player.display_name}: {quests_played}\n"
+    if quest_info is None:
+        embed_colour = "#ffffff"
+    else:
+        embed_colour = quest_info.embed_colour
+    return discord.Embed(
+        title="Quests Played:",
+        description=namestring,
+        color=discord.Color.from_str(embed_colour))
+
 # ----------------------MAIN PROGRAM----------------------
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions()
+
+
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
 

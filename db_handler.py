@@ -58,6 +58,8 @@ def _create_tables() -> None:
     );
     """
 
+    _execute_query(connection, create_players_table, ())
+
 
 def _execute_query(connection: Connection, query: str, vars: Tuple) -> None:
     """Execute the given query with the given connection (database).
@@ -370,6 +372,54 @@ def del_sticky(channel_id: int):
     """
     sticky_del = f"DELETE FROM stickies WHERE channel_id = ?"
     _execute_query(connection, sticky_del, (channel_id,))
+
+
+def get_player(player_id: int) -> int:
+    """Gets a player and the amount of quests they've run, and if they aren't
+    in the db, initialize them with 0 quests made.
+
+    Args:
+        player_id (int): The id of the player to check.
+
+    Returns:
+        int: The amount of quests that player has run.
+    """
+    player_query = """
+    SELECT quests_completed FROM players
+    WHERE player_id = ?;"""
+
+    query_return = _execute_read_query(connection, player_query, (player_id,))
+    if query_return is None:
+        # The player doesn't exist in the db, let's add them
+        player_add = """
+        INSERT INTO
+            players (
+                player_id,
+                quests_completed
+            )
+        VALUES
+            (?, ?);
+        """
+        _execute_query(connection, player_add, (player_id, 0))
+        return 0
+    return query_return[0]
+
+
+def update_player(player_id: int, quests_completed: int) -> None:
+    """Sets an entry in the db to a specific value.
+
+    Args:
+        player_id (int): The player id of the row that should be updated.
+        quests_completed (int): The amount of completed quests that should be entered.
+    """
+    player_update = """
+        UPDATE players
+        SET
+            quests_completed = ?
+        WHERE
+            player_id = ?
+    """
+    _execute_query(connection, player_update, (quests_completed, player_id))
 
 
 global connection
