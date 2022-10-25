@@ -373,8 +373,6 @@ def del_sticky(channel_id: int):
     sticky_del = f"DELETE FROM stickies WHERE channel_id = ?"
     _execute_query(connection, sticky_del, (channel_id,))
 
-# TODO; need docs for these
-
 
 def get_player(player_id: int) -> int:
     """Gets a player and the amount of quests they've run, and if they aren't
