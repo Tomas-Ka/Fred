@@ -307,7 +307,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             return
 
         if not self.complete_quest_flag.value.lower(
-        ) == "yes" and not self.thread_del_flag.value.lower() == "no":
+        ) == "yes" and not self.complete_quest_flag.value.lower() == "no":
             await interaction.response.send_message("Quest completion flag has to be yes or no", ephemeral=True)
             return
 
@@ -420,15 +420,15 @@ async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: b
 
         # Check so that we don't have over 20 players in the quest, which would
         # warrant pure fear for other reasons, but eh
-        if len(player_lists) > 20:
+        if len(player_list) > 20:
             return discord.Embed(
                 title="Quests Played:",
                 description="Too many players in channel (more than 20)",
                 color=discord.Color.from_str("#ffffff")
             )
-
         for player in player_list:
             members_in_channel.append(channel.guild.get_member(player))
+            
     else:
         if channel is discord.Thread:
             # fetch_members is an api call to discord, which isn't great, but I
@@ -450,9 +450,10 @@ async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: b
             continue
         if increment:
             quests_played = db.get_player(player.id) + 1
-            db.update_player(player_id, quests_played)
+            db.update_player(player.id, quests_played)
         else:
             quests_played = db.get_player(player.id)
+        
         players[player] = quests_played
         namestring += f"{player.display_name}: {quests_played}\n"
     if quest_info is None:
