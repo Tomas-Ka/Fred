@@ -3,3 +3,10 @@
 
 # Environments
 .env
+*.swp
+*~
+activate/
+bin/
+lib/
+pyvenv.cfg
+share/
