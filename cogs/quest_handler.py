@@ -66,8 +66,9 @@ class PersistentQuestJoinView(discord.ui.View):
         namestring = ""
         for player_id in self.info._players:
             name = interaction.guild.get_member(player_id).display_name
-            namestring += name + "\n"
-        await interaction.channel.get_thread(self.info.thread_id).get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title=f"Players: {len(self.info._players)}", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
+            quests_played = db.get_player(player_id)
+            namestring += f"`{name}`: {quests_played}\n"
+        await interaction.channel.get_thread(self.info.thread_id).get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
         db.update_quest(self.quest_id, self.info)
 
 
