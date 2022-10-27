@@ -349,6 +349,36 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
 
+class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
+    def __init__(self, user=discord.Member):
+        super().__init__()
+        self.user = user
+        self.player.label = f'{user.display_name} quest count:'
+        self.player.default = db.get_player(user.id)
+    
+    player = discord.ui.TextInput(
+        style = discord.TextStyle.short,
+        label = "quests played by user"
+    )
+    
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        
+        try:
+            amount = int(self.player.value)
+            print(amount)
+            print(self.user.id)
+            db.update_player(self.user.id, amount)
+            await interaction.response.send_message(f"Updated amount of quests for player {self.user.display_name} to be {self.player.value}")
+        except ValueError:
+            await interaction.response.send_message(f'"{self.player.value}" is not a number')
+           
+           
+    
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
+
+        # make sure we know what the error is
+        traceback.print_tb(error.__traceback__)
 
 # -----------------------MAIN CLASS-----------------------
 class QuestHandler(commands.Cog):
@@ -360,39 +390,66 @@ class QuestHandler(commands.Cog):
             name="Delete Quest", callback=self.del_quest)
         self.ctx_get_quests_played = app_commands.ContextMenu(
             name="Get quests played", callback=self.get_quests_played)
+        self.ctx_set_quests_played = app_commands.ContextMenu(
+            name="Set quests played", callback=self.set_quests_played)
 
         self.bot.tree.add_command(self.ctx_edit_quest)
         self.bot.tree.add_command(self.ctx_del_quest)
         self.bot.tree.add_command(self.ctx_get_quests_played)
+        self.bot.tree.add_command(self.ctx_set_quests_played)
 
-    # command to create a new quest (/create_quest), should be locked to DM
-    # role
+    
     @app_commands.command(description="Make a Quest")
     async def create_quest(self, interaction: discord.Interaction) -> None:
+        """Command to create a new quest (/create_quest), should be locked to DM role.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+        """        
         await interaction.response.send_modal(CreateQuest())
 
-    # command to get how many quests players in a channel have played. Should
-    # also be locked to DM
     @app_commands.command(
         description="Get amount of quests played for all users in the channel")
     async def get_all_quests_played(self, interaction: discord.Interaction) -> None:
+        """Command to get how many quests players in a channel have played.
+        Should be locked to DM role.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+        """        
         embed = await _get_quests_played(interaction.channel)
         await interaction.response.send_message(embed=embed)
 
-    # command to get the quests played by a specific user, doesn't have to be
-    # locked to DM role
     async def get_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        """Command to get the quests played by a specific user, doesn't have to be locked to DM role.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            user (discord.Member): The user who the command should run on, is also passed automatically.
+        """        
         quests = db.get_player(user.id)
         await interaction.response.send_message(f"{user.display_name} has played {quests} quests")
+    
+    async def set_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        await interaction.response.send_modal(SetQuestAmount(user))
 
-    # command to edit a quest (right click and edit quest), should be locked
-    # to DM role
     async def edit_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
+        """Command to edit a quest (right click and edit quest), should be locked to DM role.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            message (discord.Message): The quest message the command should run on, also passed automatically.
+        """        
         await interaction.response.send_modal(EditQuest(message))
 
-    # command to delete quest from memory and storage (right click and
-    # del_quest), should be locked to DM role
     async def del_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
+        """command to delete quest from memory and storage (right click and del_quest),
+        should be locked to DM role
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+            message (discord.Message): The quest message the command should run on, also passed automatically.
+        """        
         await interaction.response.send_modal(DelQuest(message))
 
 
