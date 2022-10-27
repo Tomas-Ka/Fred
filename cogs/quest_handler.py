@@ -365,8 +365,6 @@ class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
         
         try:
             amount = int(self.player.value)
-            print(amount)
-            print(self.user.id)
             db.update_player(self.user.id, amount)
             await interaction.response.send_message(f"Updated amount of quests for player {self.user.display_name} to be {self.player.value}")
         except ValueError:
