@@ -289,7 +289,7 @@ def del_quest_by_title(quest_title: str) -> None:
     Args:
         quest_title (str): The title of the quest to remove.
     """
-    quest_del = f"DELETE FROM quests WHERE quest_title = ?"
+    quest_del = "DELETE FROM quests WHERE quest_title = ?"
     _execute_query(connection, quest_del, (quest_title,))
 
 
@@ -299,7 +299,7 @@ def del_quest(id: int) -> None:
     Args:
         id (int): The id of the quest to remove.
     """
-    quest_del = f"DELETE FROM quests WHERE id = ?"
+    quest_del = "DELETE FROM quests WHERE id = ?"
     _execute_query(connection, quest_del, (id,))
 
 
@@ -370,7 +370,7 @@ def del_sticky(channel_id: int):
     Args:
         channel_id (int): The Id of the channel to remove the sticky from
     """
-    sticky_del = f"DELETE FROM stickies WHERE channel_id = ?"
+    sticky_del = "DELETE FROM stickies WHERE channel_id = ?"
     _execute_query(connection, sticky_del, (channel_id,))
 
 
