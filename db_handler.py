@@ -139,9 +139,11 @@ def get_quest_by_title(quest_title) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
+    #the star unpacks the list into separate objects to be fed into the function
     if query_return:
         quest = QuestInfo(*query_return[1:])
-    return quest
+        return quest
+    return None
 
 
 def get_quest(quest_id: int) -> QuestInfo:
@@ -163,10 +165,10 @@ def get_quest(quest_id: int) -> QuestInfo:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    quest = None
     if query_return:
         quest = QuestInfo(*query_return[1:])
-    return quest
+        return quest
+    return None
 
 
 def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
@@ -174,7 +176,7 @@ def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
     and a questInfo object, given a quest title.
 
     Args:
-        quest_id (int): The quest name to get from the database.
+        quest_title (str): The quest name to get from the database.
 
     Returns:
         Tuple[int, QuestInfo]: An object containing the data from the db.
@@ -186,14 +188,36 @@ def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
     query_return = _execute_read_query(connection, quest_query, (quest_title,))
+    if query_return:
+        quest = QuestInfo(*query_return[1:])
+        return (query_return[0], quest)
+    return None
+
+def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
+    """Returns a tuple containing the quest id
+    and a questInfo object, given the id for the quest thread.
+
+    Args:
+        thread_id (int): The thread id search for in the database.
+
+    Returns:
+        Tuple[int, QuestInfo]: An object containing the data from the db.
+    """
+    quest_query = """
+    SELECT * FROM quests
+    WHERE thread_id = ?;"""
+
+    # This returns a list and we take the first object as there should only
+    # ever be one due to unique constraints in the db
+    query_return = _execute_read_query(connection, quest_query, (thread_id,))
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    quest = []
+    
     if query_return:
         quest = QuestInfo(*query_return[1:])
-    return (query_return[0], quest)
-
+        return (query_return[0], quest)
+    return None
 
 def get_quest_list() -> List[QuestInfo]:
     """Returns a list of all quests in the database

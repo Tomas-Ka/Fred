@@ -431,8 +431,10 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
         if interaction.channel.type == discord.ChannelType.public_thread:
-            db.get_quest(interaction.channel.id)
-            embed = await _get_all_quests_played(interaction.channel, increment=True)
+            
+            
+            quest_info = db.get_quest_by_thread_id(interaction.channel.id)[1]
+            embed = await _get_all_quests_played(interaction.channel, quest_info, True)
             await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message("This channel is not a quest thread and thus the command can't be used", ephemeral=True)
