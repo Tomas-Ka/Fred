@@ -280,13 +280,6 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         default="no"
     )
 
-    complete_quest_flag = discord.ui.TextInput(
-        style=discord.TextStyle.short,
-        max_length=3,
-        label="Count as completed quest? (yes/no)",
-        default="yes"
-    )
-
     confirmation = discord.ui.TextInput(
         style=discord.TextStyle.short,
         label="Retype quest name to confirm"
@@ -307,11 +300,6 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await interaction.response.send_message("Thread deletion flag has to be yes or no", ephemeral=True)
             return
 
-        if not self.complete_quest_flag.value.lower(
-        ) == "yes" and not self.complete_quest_flag.value.lower() == "no":
-            await interaction.response.send_message("Quest completion flag has to be yes or no", ephemeral=True)
-            return
-
         # if we should delete the message, delete it
         if self.msg_del_flag.value.lower() == "yes":
             await self.message.delete()
@@ -325,14 +313,14 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             disabled_view.stop()
 
         thread = interaction.guild.get_thread(self.quest_info.thread_id)
-        embed = await _get_quests_played(thread, self.quest_info, True)
-        await thread.send(embed=embed)
 
         # if we should delete the thread, do so
         if self.thread_del_flag.value.lower() == "yes":
             await thread.delete()
         else:
-            # Lock the quest
+            # Send quests played embed and lock the quest
+            embed = await _get_all_quests_played(thread, self.quest_info)
+            await thread.send(embed=embed)
             await thread.edit(locked=True, archived=True)
 
         #del role
@@ -349,29 +337,27 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
 
+
 class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
     def __init__(self, user=discord.Member):
         super().__init__()
         self.user = user
         self.player.label = f'{user.display_name} quest count:'
         self.player.default = db.get_player(user.id)
-    
+
     player = discord.ui.TextInput(
-        style = discord.TextStyle.short,
-        label = "quests played by user"
+        style=discord.TextStyle.short,
+        label="quests played by user"
     )
-    
+
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        
         try:
             amount = int(self.player.value)
             db.update_player(self.user.id, amount)
             await interaction.response.send_message(f"Updated amount of quests for player {self.user.display_name} to be {self.player.value}")
         except ValueError:
             await interaction.response.send_message(f'"{self.player.value}" is not a number')
-           
-           
-    
+
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
 
@@ -396,14 +382,13 @@ class QuestHandler(commands.Cog):
         self.bot.tree.add_command(self.ctx_get_quests_played)
         self.bot.tree.add_command(self.ctx_set_quests_played)
 
-    
     @app_commands.command(description="Make a Quest")
     async def create_quest(self, interaction: discord.Interaction) -> None:
         """Command to create a new quest (/create_quest), should be locked to DM role.
 
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
-        """        
+        """
         await interaction.response.send_modal(CreateQuest())
 
     @app_commands.command(
@@ -414,8 +399,8 @@ class QuestHandler(commands.Cog):
 
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
-        """        
-        embed = await _get_quests_played(interaction.channel)
+        """
+        embed = await _get_all_quests_played(interaction.channel)
         await interaction.response.send_message(embed=embed)
 
     async def get_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
@@ -424,12 +409,35 @@ class QuestHandler(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             user (discord.Member): The user who the command should run on, is also passed automatically.
-        """        
+        """
         quests = db.get_player(user.id)
         await interaction.response.send_message(f"{user.display_name} has played {quests} quests")
-    
+
     async def set_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
+        """Command that sets amount of quests played by a specific user, should be locked to some sort of admin role.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically
+            user (discord.Member): The user who the commmand should un on, is also passed automatically.
+        """
         await interaction.response.send_modal(SetQuestAmount(user))
+
+    @app_commands.command(
+        description="Increments the quest played count for all players in the thread")
+    async def update_quest_count(self, interaction: discord.Interaction) -> None:
+        """A command to increment the quests played by all users in a thread. Should be locked to dm role.
+
+        Args:
+            interaction (discord.Interaction): The discord interaction obj that is passed automatically.
+        """
+        if interaction.channel.type == discord.ChannelType.public_thread:
+            
+            
+            quest_info = db.get_quest_by_thread_id(interaction.channel.id)[1]
+            embed = await _get_all_quests_played(interaction.channel, quest_info, True)
+            await interaction.response.send_message(embed=embed)
+        else:
+            await interaction.response.send_message("This channel is not a quest thread and thus the command can't be used", ephemeral=True)
 
     async def edit_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
         """Command to edit a quest (right click and edit quest), should be locked to DM role.
@@ -437,7 +445,7 @@ class QuestHandler(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             message (discord.Message): The quest message the command should run on, also passed automatically.
-        """        
+        """
         await interaction.response.send_modal(EditQuest(message))
 
     async def del_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
@@ -447,12 +455,12 @@ class QuestHandler(commands.Cog):
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             message (discord.Message): The quest message the command should run on, also passed automatically.
-        """        
+        """
         await interaction.response.send_modal(DelQuest(message))
 
 
 # ---------------------OTHER FUNCTIONS--------------------
-async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+async def _get_all_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
     THIS USES AN API CALL TO DISCORD, handle with care
 
@@ -484,9 +492,9 @@ async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: b
             )
         for player in player_list:
             members_in_channel.append(channel.guild.get_member(player))
-            
+
     else:
-        if channel is discord.Thread:
+        if channel.type == discord.ChannelType.public_thread:
             # fetch_members is an api call to discord, which isn't great, but I
             # couldn't find a better solution, and this *shouldn't* be too bad...
             # Hopefully
@@ -509,7 +517,7 @@ async def _get_quests_played(channel, quest_info: QuestInfo = None, increment: b
             db.update_player(player.id, quests_played)
         else:
             quests_played = db.get_player(player.id)
-        
+
         players[player] = quests_played
         namestring += f"{player.display_name}: {quests_played}\n"
     if quest_info is None:
