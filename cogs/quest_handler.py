@@ -300,20 +300,10 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await interaction.response.send_message("Thread deletion flag has to be yes or no", ephemeral=True)
             return
 
-        # if we should delete the message, delete it
-        if self.msg_del_flag.value.lower() == "yes":
-            await self.message.delete()
 
-        # otherwise, disable the join quest button
-        else:
-            disabled_view = PersistentQuestJoinView(
-                self.quest_info, disabled=True)
-            await self.message.edit(view=disabled_view)
-            # stop the persistent view to stop wasting resources
-            disabled_view.stop()
 
         thread = interaction.guild.get_thread(self.quest_info.thread_id)
-
+        
         # if we should delete the thread, do so
         if self.thread_del_flag.value.lower() == "yes":
             await thread.delete()
@@ -330,6 +320,18 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         db.del_quest(self.message.id)
 
         await interaction.response.send_message(f"Quest {self.quest_info.quest_title} removed!", ephemeral=True)
+    
+        # if we should delete the message, delete it
+        if self.msg_del_flag.value.lower() == "yes":
+            await self.message.delete()
+        # otherwise, disable the join quest button
+        else:
+            disabled_view = PersistentQuestJoinView(
+                self.quest_info, disabled=True)
+            await self.message.edit(view=disabled_view)
+            # stop the persistent view to stop wasting resources
+            disabled_view.stop()
+    
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
