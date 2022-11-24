@@ -120,32 +120,6 @@ def _execute_read_query(connection: Connection,
     except Error as e:
         print(f"The error '{e}' occurred")
 
-
-def get_quest_by_title(quest_title) -> QuestInfo:
-    """Returns the first found quest given the quest title.
-
-    Args:
-        quest_title (string): The title of the quest to search for.
-
-    Returns:
-        QuestInfo: An object containing the data from the db.
-    """
-    quest_query = """
-    SELECT * FROM quests
-    WHERE quest_title = ?"""
-    # This returns a list and we take the first object as there should only
-    # ever be one due to unique constraints in the db
-    query_return = _execute_read_query(connection, quest_query, (quest_title))
-
-    # The first value returned is the id of the quest, which we don't want to
-    # parse
-    #the star unpacks the list into separate objects to be fed into the function
-    if query_return:
-        quest = QuestInfo(*query_return[1:])
-        return quest
-    return None
-
-
 def get_quest(quest_id: int) -> QuestInfo:
     """Returns a quest given a quest id.
 
