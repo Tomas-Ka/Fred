@@ -2,7 +2,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from typing import Optional
+from typing import Optional, List
 import db_handler as db
 
 
@@ -15,8 +15,9 @@ FILE_LOCATION = "."
 
 
 class StickyHandler(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: commands.Bot, sticky_channels: List) -> None:
         self.bot = bot
+        self.sticky_channels = sticky_channels
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
@@ -25,7 +26,7 @@ class StickyHandler(commands.Cog):
         if msg.author.id == self.bot.user.id:
             return
         # if we don't have a sticky in the channel, ignore
-        if msg.channel.id not in STICKY_CHANNELS:
+        if msg.channel.id not in self.sticky_channels:
             return
         # create the sticky embed (should probably cash this somewhere, but
         # wth, this works)
@@ -50,14 +51,14 @@ class StickyHandler(commands.Cog):
         sticky_embed = discord.Embed(title="Character Template", description="Här lägger ni in era nya karaktärers introduktion, det medlemmar i gillet skulle veta.\nREKOMMENDERAD MALL FÖR HUR MAN SKRIVER IN SIN KARAKTÄR: \n\n(namn), (klass/klasser och antalet levelar i klassen/klasserna, inkludera subclass/subclasses), (race), (Antal GP), (Lista över magic items) \n\n(Kort beskrivning av karaktärens background/personlighet, så vi vet vem vi har att göra med. Inga detaljer behöver vara med här, särskillt ingenting som ni vill att andra spelare inte ska känna till.) \n\n(Kort beskrivning av playstyle, till exempel:\nGet into opponent's faces and hit them with an axe;\nConfuse and disrupt with illusion magic;\nSnipe down important targets with a heavy crossbow) \n\nTryck shift+enter om ni vill göra en radbrytning utan att skicka meddelandet!", color=0x00ff00)
         sticky_embed.set_footer(text="Stickied by Nat 1 Fred")
         # check if the sticky already exists in the channel
-        if interaction.channel.id in STICKY_CHANNELS:
+        if interaction.channel.id in self.sticky_channels:
             # if it exists, just return an error message
             await interaction.response.send_message("There is already a sticky in that channel", ephemeral=True)
         else:
             # if it doesn't exist, create a new sticky and add it to the db
             new_sticky = await interaction.channel.send(embed=sticky_embed)
             db.create_sticky(interaction.channel.id, new_sticky.id)
-            STICKY_CHANNELS.append(interaction.channel.id)
+            self.sticky_channels.append(interaction.channel.id)
             await interaction.response.send_message(f"Sticky created in channel: {interaction.channel.name}", ephemeral=True)
 
     @app_commands.command(description="Removes the New Character sticky from a channel")
@@ -72,13 +73,13 @@ class StickyHandler(commands.Cog):
             del_sticky (Optional[bool], optional): Delete the current sticky message or not; defaults to False.
         """
         # if a sticky exists in selected channel
-        if interaction.channel.id in STICKY_CHANNELS:
+        if interaction.channel.id in self.sticky_channels:
             # if del_sticky flag is set, delete message, else just delete the
             # database entry
             if del_sticky:
                 await interaction.channel.get_partial_message(db.get_sticky(interaction.channel.id)).delete()
             db.del_sticky(interaction.channel.id)
-            STICKY_CHANNELS.remove(interaction.channel.id)
+            self.sticky_channels.remove(interaction.channel.id)
             await interaction.response.send_message("Sticky has been deleted" if del_sticky else "Sticky has been unsubscribed", ephemeral=True)
         else:
             # just return an error as there isn't a sticky message to remove
@@ -90,7 +91,6 @@ class StickyHandler(commands.Cog):
 # and is run when the cog is loaded with bot.load_extensions()
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.sticky_handler begin loading")
-    global STICKY_CHANNELS
 
     STICKY_CHANNELS = db.get_sticky_list()
     print("\t\tLoaded stickies in channels:")
@@ -99,4 +99,8 @@ async def setup(bot: commands.Bot) -> None:
     if not STICKY_CHANNELS:
         print("\t\t\tNo stickies in database")
 
-    await bot.add_cog(StickyHandler(bot))
+    sticky_channels = []
+    for channel in STICKY_CHANNELS:
+        sticky_channels.append(channel[0])
+        
+    await bot.add_cog(StickyHandler(bot, sticky_channels))
