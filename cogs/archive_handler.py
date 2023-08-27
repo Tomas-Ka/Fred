@@ -10,7 +10,7 @@ ARCHIVE_ROLE = "Archive"
 
 
 class PersistentArchiveRoleView(discord.ui.View):
-    # This is the View that adds the button to get or remove the Archive role
+    # This is the View that adds the button to get or remove the Archive role.
     def __init__(self) -> None:
         # set the timeout to none so the View can be persistent
         super().__init__(timeout=None)
@@ -39,7 +39,7 @@ class ArchiveHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    # command to send the archive join message (/join_arhive), should be
+    # command to send the archive join message (/join_archive), should be
     # locked to admin role
     @app_commands.command(description="Sends the Archive joining message")
     async def join_archive(self, interaction: discord.Interaction) -> None:

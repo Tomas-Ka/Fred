@@ -120,6 +120,7 @@ def _execute_read_query(connection: Connection,
     except Error as e:
         print(f"The error '{e}' occurred")
 
+
 def get_quest(quest_id: int) -> QuestInfo:
     """Returns a quest given a quest id.
 
@@ -167,6 +168,7 @@ def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
         return (query_return[0], quest)
     return None
 
+
 def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
     """Returns a tuple containing the quest id
     and a questInfo object, given the id for the quest thread.
@@ -187,11 +189,12 @@ def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
-    
+
     if query_return:
         quest = QuestInfo(*query_return[1:])
         return (query_return[0], quest)
     return None
+
 
 def get_quest_list() -> List[QuestInfo]:
     """Returns a list of all quests in the database

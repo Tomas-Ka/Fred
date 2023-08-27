@@ -102,5 +102,5 @@ async def setup(bot: commands.Bot) -> None:
     sticky_channels = []
     for channel in STICKY_CHANNELS:
         sticky_channels.append(channel[0])
-        
+
     await bot.add_cog(StickyHandler(bot, sticky_channels))

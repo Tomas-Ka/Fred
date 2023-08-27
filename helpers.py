@@ -2,8 +2,8 @@ import json
 
 
 class QuestInfo():
-    # This is just a blank class so I more easily can pass Quest data between
-    # objects
+    # This is just a blank class so I can pass Quest data as a single
+    # object.
     def __init__(
             self,
             quest_title: str,
@@ -32,12 +32,20 @@ class QuestInfo():
     def players(self) -> str:
         return json.dumps(self._players)
 
-    # adds a player (in the form of a their id) to the list
     def add_player(self, member: int) -> None:
+        """Adds a player to the list.
+
+        Args:
+            member (int): player ID
+        """
         self._players.append(member)
 
-    # removes a player (in the form of a their id) from the list
     def remove_player(self, member: int) -> None:
+        """Removes a player from the list
+
+        Args:
+            member (int): player ID
+        """
         try:
             self._players.remove(member)
         except ValueError:

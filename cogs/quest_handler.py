@@ -19,7 +19,7 @@ FILE_LOCATION = "."
 
 # ---------.----------PERSISTENT VIEWS--------------------
 class PersistentQuestJoinView(discord.ui.View):
-    # View for the join quest button
+    # View for the join quest button.
     def __init__(self, info: QuestInfo, disabled: bool = False) -> None:
         self.quest_id = db.get_quest_by_title(info.quest_title)[0]
         self.info = info
@@ -37,7 +37,7 @@ class PersistentQuestJoinView(discord.ui.View):
         super().__init__(timeout=None)
 
     # The callback function for self.join_button, it is added where the Button
-    # is defined
+    # is defined.
     async def quest_join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         dm_role = discord.utils.get(interaction.guild.roles, name="Dm")
 
@@ -74,7 +74,7 @@ class PersistentQuestJoinView(discord.ui.View):
 
 # ------------------------MODALS--------------------------
 class CreateQuest(discord.ui.Modal, title="Create Quest"):
-
+    # The modal that shows up when you want to create a quest.
     quest_title = discord.ui.TextInput(
         label="Quest title",
         placeholder="Quest title here..."
@@ -104,7 +104,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         # create embed for the message (with error handling for the colour
-        # selection)
+        # selection).
         try:
             embed_colour = webcolors.name_to_hex(self.embed_colour.value)
         except ValueError:
@@ -125,7 +125,6 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
             value=self.contractor.value,
             inline=True)
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
-        #embed.set_footer(text="I have no clue what to put here")
 
         # create the quest role with the name of the quest title
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
@@ -164,7 +163,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
 
 class EditQuest(discord.ui.Modal, title="Edit Quest"):
-
+    # The modal that shows up when you want to edit a quest.
     def __init__(self, message: discord.Message) -> None:
         super().__init__()
         self.message = message
@@ -225,7 +224,6 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
             value=self.contractor.value,
             inline=True)
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
-        #embed.set_footer(text="I have no clue what to put here")
         await self.message.edit(embed=embed)
 
         # edit thread and role names
@@ -254,7 +252,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
 
 
 class DelQuest(discord.ui.Modal, title="Delete Quest"):
-    # The confirmation modal that shows up when you want to delete a quest
+    # The confirmation modal that shows up when you want to delete a quest.
     def __init__(self, message: discord.Message) -> None:
         super().__init__()
         self.message = message
@@ -300,10 +298,8 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await interaction.response.send_message("Thread deletion flag has to be yes or no", ephemeral=True)
             return
 
-
-
         thread = interaction.guild.get_thread(self.quest_info.thread_id)
-        
+
         # if we should delete the thread, do so
         if self.thread_del_flag.value.lower() == "yes":
             await thread.delete()
@@ -313,14 +309,14 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await thread.send(embed=embed)
             await thread.edit(locked=True, archived=True)
 
-        #del role
+        # del role
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
 
-        #del quest
+        # del quest
         db.del_quest(self.message.id)
 
         await interaction.response.send_message(f"Quest {self.quest_info.quest_title} removed!", ephemeral=True)
-    
+
         # if we should delete the message, delete it
         if self.msg_del_flag.value.lower() == "yes":
             await self.message.delete()
@@ -331,7 +327,6 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await self.message.edit(view=disabled_view)
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
-    
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
@@ -341,6 +336,8 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
 
 
 class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
+    # The modal that lets you set the amount of quests played by a certain
+    # player.
     def __init__(self, user=discord.Member):
         super().__init__()
         self.user = user
@@ -367,6 +364,8 @@ class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
         traceback.print_tb(error.__traceback__)
 
 # -----------------------MAIN CLASS-----------------------
+
+
 class QuestHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -396,7 +395,7 @@ class QuestHandler(commands.Cog):
     @app_commands.command(
         description="Get amount of quests played for all users in the channel")
     async def get_all_quests_played(self, interaction: discord.Interaction) -> None:
-        """Command to get how many quests players in a channel have played.
+        """Command to get how many quests players in a channel have played (/get_all_quests_played).
         Should be locked to DM role.
 
         Args:
@@ -427,14 +426,14 @@ class QuestHandler(commands.Cog):
     @app_commands.command(
         description="Increments the quest played count for all players in the thread")
     async def update_quest_count(self, interaction: discord.Interaction) -> None:
-        """A command to increment the quests played by all users in a thread. Should be locked to dm role.
+        """A command to increment the quests played by all users in a thread (/update_quest_count).
+        Should be locked to dm role.
 
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
         if interaction.channel.type == discord.ChannelType.public_thread:
-            
-            
+
             quest_info = db.get_quest_by_thread_id(interaction.channel.id)[1]
             embed = await _get_all_quests_played(interaction.channel, quest_info, True)
             await interaction.response.send_message(embed=embed)
@@ -451,8 +450,8 @@ class QuestHandler(commands.Cog):
         await interaction.response.send_modal(EditQuest(message))
 
     async def del_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
-        """command to delete quest from memory and storage (right click and del_quest),
-        should be locked to DM role
+        """Command to delete quest from memory and storage (right click and del_quest),
+        should be locked to DM role.
 
         Args:
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
@@ -464,7 +463,7 @@ class QuestHandler(commands.Cog):
 # ---------------------OTHER FUNCTIONS--------------------
 async def _get_all_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
-    THIS USES AN API CALL TO DISCORD, handle with care
+    THIS USES AN API CALL TO DISCORD, handle with care.
 
     Args:
         channel (any discord channel): The channel to check for players in.
@@ -499,7 +498,7 @@ async def _get_all_quests_played(channel, quest_info: QuestInfo = None, incremen
         if channel.type == discord.ChannelType.public_thread:
             # fetch_members is an api call to discord, which isn't great, but I
             # couldn't find a better solution, and this *shouldn't* be too bad...
-            # Hopefully
+            # hopefully
             members_in_channel = await channel.fetch_members()
         else:
             members_in_channel = channel.members
