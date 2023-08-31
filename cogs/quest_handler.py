@@ -36,8 +36,8 @@ class PersistentQuestJoinView(discord.ui.View):
         # set timeout to zero which is needed for a persistent view
         super().__init__(timeout=None)
 
-    # The callback function for self.join_button, it is added where the Button
-    # is defined.
+     # Callback for the join button, is linked in init where the button is
+     # defined.
     async def quest_join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         dm_role = discord.utils.get(interaction.guild.roles, name="Dm")
 
@@ -464,7 +464,7 @@ class QuestHandler(commands.Cog):
 # ---------------------OTHER FUNCTIONS--------------------
 async def _get_all_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
-    THIS USES AN API CALL TO DISCORD, handle with care.
+    May cause fred to hit a rate limit if used too much, handle with care.
 
     Args:
         channel (any discord channel): The channel to check for players in.
