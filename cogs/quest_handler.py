@@ -17,7 +17,7 @@ from helpers import QuestInfo
 FILE_LOCATION = "."
 
 
-# ---------.----------PERSISTENT VIEWS--------------------
+# --------------------PERSISTENT VIEWS--------------------
 class PersistentQuestJoinView(discord.ui.View):
     # View for the join quest button.
     def __init__(self, info: QuestInfo, disabled: bool = False) -> None:
@@ -68,7 +68,7 @@ class PersistentQuestJoinView(discord.ui.View):
             name = interaction.guild.get_member(player_id).display_name
             quests_played = db.get_player(player_id)
             namestring += f"`{name}`: {quests_played}\n"
-        await interaction.channel.get_thread(self.info.thread_id).get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
+        await interaction.channel.get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
         db.update_quest(self.quest_id, self.info)
 
 
@@ -151,8 +151,8 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
         db.create_quest(msg.id, quest)
 
-        # set the quest join button into the quest info message
-        await msg.edit(view=PersistentQuestJoinView(quest))
+        # set the quest join button to appear under the joined players list
+        await pin_message.edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -227,7 +227,8 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         await self.message.edit(embed=embed)
 
         # edit thread and role names
-        await self.message.channel.get_thread(thread_id).edit(name=self.quest_title.value)
+        thread = self.message.channel.get_thread(thread_id)
+        await thread.edit(name=self.quest_title.value)
         await self.message.guild.get_role(quest_role_id).edit(name=self.quest_title.value)
 
         quest = QuestInfo(self.quest_title.value,
@@ -241,7 +242,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           self.quest_info.players
                           )
         db.update_quest(self.message.id, quest)
-        await self.message.edit(view=PersistentQuestJoinView(quest))
+        await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=PersistentQuestJoinView(quest))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -324,7 +325,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         else:
             disabled_view = PersistentQuestJoinView(
                 self.quest_info, disabled=True)
-            await self.message.edit(view=disabled_view)
+            await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=disabled_view)
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
 

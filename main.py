@@ -12,7 +12,7 @@ token = environ["TOKEN"]
 
 # -----------------------STATIC VARS----------------------
 # test guild, discord bot testing grounds
-TEST_GUILD = discord.Object(752506220400607295)  # 538846461614489675
+# TEST_GUILD = discord.Object(put ID of guild here)
 
 
 # -----------------------MAIN CLASS-----------------------
