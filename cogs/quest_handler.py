@@ -130,7 +130,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
 
         # send the actual message with the quest info
-        msg = await interaction.channel.send(embed=embed)
+        msg = await interaction.channel.send(content=f'<@&{discord.utils.get(interaction.guild.roles, name="Player").id}>', embed=embed)
 
         # create & attatch the thread to the newly created quest info message
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
@@ -224,7 +224,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
             value=self.contractor.value,
             inline=True)
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
-        await self.message.edit(embed=embed)
+        await self.message.edit(content=f'<@&{discord.utils.get(interaction.guild.roles, name="Player").id}>', embed=embed)
 
         # edit thread and role names
         thread = self.message.channel.get_thread(thread_id)
@@ -434,12 +434,18 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
         if interaction.channel.type == discord.ChannelType.public_thread:
-
-            quest_info = db.get_quest_by_thread_id(interaction.channel.id)[1]
-            embed = await _get_all_quests_played(interaction.channel, quest_info, True)
-            await interaction.response.send_message(embed=embed)
+                quest_info = db.get_quest_by_thread_id(interaction.channel.id)
+                # check to see if return is empty (aka the quest doesn't exist in the database)
+                if quest_info != None:
+                    quest_info = quest_info[1]
+                else:
+                    await interaction.response.send_message("Error\nThis is not a quest thread", ephemeral=True)
+                    return
+                
+                embed = await _get_all_quests_played(interaction.channel, quest_info, True)
+                await interaction.response.send_message(embed=embed)
         else:
-            await interaction.response.send_message("This channel is not a quest thread and thus the command can't be used", ephemeral=True)
+            await interaction.response.send_message("Error\nThis is not a quest thread", ephemeral=True)
 
     async def edit_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
         """Command to edit a quest (right click and edit quest), should be locked to DM role.
@@ -448,6 +454,10 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             message (discord.Message): The quest message the command should run on, also passed automatically.
         """
+        if (db.get_quest(message.id) == None):
+            # quest does not exist, so we can return an error and skip the modal
+            await interaction.response.send_message("Error\nThe selected message is not a quest message", ephemeral=True)
+            return
         await interaction.response.send_modal(EditQuest(message))
 
     async def del_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
@@ -458,6 +468,11 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             message (discord.Message): The quest message the command should run on, also passed automatically.
         """
+        if (db.get_quest(message.id) == None):
+            # quest does not exist, so we can return an error and skip the modal
+            await interaction.response.send_message("Error\nThe selected message is not a quest message", ephemeral=True)
+            return
+
         await interaction.response.send_modal(DelQuest(message))
 
 
@@ -479,7 +494,7 @@ async def _get_all_quests_played(channel, quest_info: QuestInfo = None, incremen
     namestring = ""
 
     # If we are passed a quest_info object we already have a list of players
-    # we can grab, and thus less api calls
+    # we can grab, and thus make less api calls
     if quest_info:
         members_in_channel = []
         player_list = quest_info._players
