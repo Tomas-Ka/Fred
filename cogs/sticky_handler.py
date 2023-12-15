@@ -92,7 +92,7 @@ class StickyHandler(commands.Cog):
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.sticky_handler begin loading")
 
-    STICKY_CHANNELS = db.get_sticky_list()
+    STICKY_CHANNELS = await db.get_sticky_list()
     print("\t\tLoaded stickies in channels:")
     for pair in STICKY_CHANNELS:
         print(f"\t\t\t{pair[0]}")
