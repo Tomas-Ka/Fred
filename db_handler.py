@@ -422,6 +422,17 @@ def update_player(player_id: int, quests_completed: int) -> None:
     """
     _execute_query(connection, player_update, (quests_completed, player_id))
 
+def get_tz() -> None:
+    pass
+
+def set_tz() -> None:
+    pass
+
+def del_tx() -> None:
+    pass
+
+def edit_tx() -> None:
+    pass
 
 global connection
 connection = _create_connection("db.sqlite")

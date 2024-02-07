@@ -44,7 +44,8 @@ class FredBot(commands.Bot):
             'cogs.quest_handler',
             'cogs.sticky_handler',
             'cogs.archive_handler',
-            'cogs.whale_handler'
+            'cogs.whale_handler',
+            'cogs.timezone_handler'
         ]
 
         for extension in extensions:
