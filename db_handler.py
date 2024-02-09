@@ -60,6 +60,15 @@ def _create_tables() -> None:
 
     _execute_query(connection, create_players_table, ())
 
+    create_timezone_table = """
+    CREATE TABLE IF NOT EXISTS timezones (
+        "user_id" INTEGER PRIMARY KEY NOT NULL,
+        "timezone" TEXT NOT NULL
+    );
+    """
+
+    _execute_query(connection, create_timezone_table, ())
+
 
 def _execute_query(connection: Connection, query: str, vars: Tuple) -> None:
     """Execute the given query with the given connection (database).
@@ -401,7 +410,7 @@ def get_player(player_id: int) -> int:
         VALUES
             (?, ?);
         """
-        _execute_query(connection, player_add, (player_id, 0))
+        _execute_query(connection, player_add, (player_id, 0,))
         return 0
     return query_return[0]
 
@@ -420,19 +429,66 @@ def update_player(player_id: int, quests_completed: int) -> None:
         WHERE
             player_id = ?
     """
-    _execute_query(connection, player_update, (quests_completed, player_id))
+    _execute_query(connection, player_update, (quests_completed, player_id,))
 
-def get_tz() -> None:
-    pass
+def get_tz(user_id: int) -> str:
+    """Gets the timezone for a user given their id.
 
-def set_tz() -> None:
-    pass
+    Args:
+        user_id (int): The Discord id of the user.
 
-def del_tx() -> None:
-    pass
+    Returns:
+        str: An Olson formatted timezone string.
+    """
+    timezone_add = """
+    SELECT timezone FROM timezones
+    WHERE user_id = ?;
+    """
+    query_return = _execute_read_query(connection, timezone_add, (user_id,))
+    if query_return is None:
+        return None
+    else:
+        return query_return[0]
 
-def edit_tx() -> None:
-    pass
+def set_tz(user_id: int, timezone: str) -> None:
+    """Sets the timezone for a user given their id.
+    if the entry already exists it is updated instead.
+
+    Args:
+        user_id (int): The Discord id of the user.
+        timezone (str): An Olson formatted timezone string.
+    """
+    if not get_tz(user_id):
+        timezone_add = """
+        INSERT INTO
+            timezones (
+                user_id,
+                timezone
+            )
+        VALUES
+            (?, ?);
+        """
+        _execute_query(connection, timezone_add, (user_id, timezone,))
+
+    else:
+        timezone_update = """
+        UPDATE timezones
+        SET
+            timezone = ?
+        WHERE
+            user_id = ?
+        """
+        _execute_query(connection, timezone_update, (timezone, user_id,))
+   
+
+def del_tz(user_id: int) -> None:
+    """Deletes the entry for a user given their id.
+
+    Args:
+        user_id (int): The Discord id of the user.
+    """    
+    timezone_del = "DELETE FROM timezones WHERE user_id = ?"
+    _execute_query(connection, timezone_del, (user_id,))
 
 global connection
 connection = _create_connection("db.sqlite")
