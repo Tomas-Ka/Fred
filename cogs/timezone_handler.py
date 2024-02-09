@@ -117,6 +117,7 @@ class TimezoneHandler(commands.Cog):
         
         db.set_tz(interaction.user.id, tz_string)
         await interaction.response.send_message(f"Set {interaction.user.display_name}'s timezone to {tz_string}")
+        print(tz_string)
     
     @tzgroup.command()
     async def get(self, interaction:discord.Interaction):
