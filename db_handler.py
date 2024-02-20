@@ -15,7 +15,7 @@ async def _create_tables() -> None:
     CREATE TABLE IF NOT EXISTS quests (
         "id" INTEGER PRIMARY KEY NOT NULL,
         "guild_id" INTEGER NOT NULL,
-        "quest_title" TEXT UNIQUE NOT NULL,
+        "quest_title" TEXT NOT NULL,
         "contractor" TEXT NOT NULL,
         "description" TEXT NOT NULL,
         "reward" TEXT NOT NULL,
@@ -435,7 +435,7 @@ async def get_player(guild_id: int, player_id: int) -> int:
         """
         await _execute_query(player_add, (player_id, guild_id, 0))
         return 0
-    return query_return[1]
+    return query_return[0]
 
 
 async def update_player(guild_id: int, player_id: int, quests_completed: int) -> None:

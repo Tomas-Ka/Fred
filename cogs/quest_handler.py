@@ -70,7 +70,7 @@ class PersistentQuestJoinView(discord.ui.View):
         namestring = ""
         for player_id in self.info._players:
             name = interaction.guild.get_member(player_id).display_name
-            quests_played = await db.get_player(player_id)
+            quests_played = await db.get_player(interaction.guild_id, player_id)
             namestring += f"`{name}`: {quests_played}\n"
         await interaction.channel.get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
         await db.update_quest(self.quest_id, self.info)
@@ -110,10 +110,12 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         # create embed for the message (with error handling for the colour
         # selection and checking if we already have a quest with the same name).
         try:
-            embed_colour = webcolors.name_to_hex(self.embed_colour.value)
+            raw_colour_value = self.embed_colour.value
+            embed_colour = webcolors.name_to_hex(raw_colour_value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
-            message = f"""Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again.
+            message = f"""Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.
+            
             Here is your quest info:
             
             **Title:** {self.quest_title.value}
@@ -124,13 +126,14 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
             **Reward:** {self.reward.value}
 
-            **Colour:** {self.embed_colour.value}"""
+            **Colour:** {raw_colour_value}"""
 
             await interaction.response.send_message(message, ephemeral=True)
             return
         
-        if db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
+        if await db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
             message = f"""The quest name "{self.quest_title.value}" is already in use, please try another name
+            
             Here is your quest info:
 
             **Title:** {self.quest_title.value}
@@ -141,7 +144,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
             **Reward:** {self.reward.value}
 
-            **Colour:** {self.embed_colour.value}"""
+            **Colour:** {raw_colour_value}"""
 
             await interaction.response.send_message(message, ephemeral=True)
             return
@@ -164,7 +167,12 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
 
         # send the actual message with the quest info
-        msg = await interaction.channel.send(content=f'<@&{discord.utils.get(interaction.guild.roles, name="Player").id}>', embed=embed)
+        # (Check that the player role exists before we ping it):
+        player_role = discord.utils.get(interaction.guild.roles, name="Player")
+        if player_role:
+            msg = await interaction.channel.send(content=f'<@&{player_role.id}>', embed=embed)
+        else:
+            msg = await interaction.channel.send(content="", embed=embed)
 
         # create & attatch the thread to the newly created quest info message
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
@@ -194,6 +202,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         try:
             message = f"""Something went wrong, please try again.
+            
             Here is your quest info:
 
             **Title:** {self.quest_title.value}
@@ -222,6 +231,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         self.message = message
         self.quest_info = quest_info
         self.quest_title.default = self.quest_info.quest_title
+        self.old_title = self.quest_info.quest_title
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
         self.reward.default = self.quest_info.reward
@@ -258,13 +268,51 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         thread_id = self.quest_info.thread_id
         quest_role_id = self.quest_info.quest_role_id
+        
+        # Checking to make sure our inputs are valid:
 
         try:
-            self.embed_colour = webcolors.name_to_hex(self.embed_colour.value)
+            raw_colour_value = self.embed_colour.value
+            self.embed_colour = webcolors.name_to_hex(raw_colour_value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
-            await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
+            message = f"""Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.
+            
+            Here is your quest info:
+            
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {raw_colour_value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
             return
+        
+        if not self.quest_title.value == self.old_title:
+            if await db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
+                message = f"""The quest name "{self.quest_title.value}" is already in use, please try another name
+                
+                Here is your quest info:
+
+                **Title:** {self.quest_title.value}
+
+                **Contractor:** {self.contractor.value}
+
+                **Description:** {self.description.value}
+
+                **Reward:** {self.reward.value}
+
+                **Colour:** {raw_colour_value}"""
+
+                await interaction.response.send_message(message, ephemeral=True)
+                return
+
+
         embed = discord.Embed(
             title=self.quest_title.value,
             description=self.description.value,
@@ -277,7 +325,13 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
             value=self.contractor.value,
             inline=True)
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
-        await self.message.edit(content=f'<@&{discord.utils.get(interaction.guild.roles, name="Player").id}>', embed=embed)
+
+        # Check that the player role exists before we ping it:
+        player_role = discord.utils.get(interaction.guild.roles, name="Player")
+        if player_role:
+            await self.message.edit(content=f'<@&{player_role.id}>', embed=embed)
+        else:
+            await self.message.edit(content="", embed=embed)
 
         # edit thread and role names
         thread = self.message.channel.get_thread(thread_id)
@@ -301,7 +355,24 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
-        await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
+        try:
+            message = f"""Something went wrong, please try again.
+            
+            Here is your quest info:
+
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {self.embed_colour.value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
 
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)

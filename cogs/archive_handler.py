@@ -47,7 +47,7 @@ class ArchiveHandler(commands.Cog):
     async def join_archive(self, interaction: discord.Interaction) -> None:
         # If we don't have an archive role in this server already, create one
         if discord.utils.get(interaction.guild.roles, name=ARCHIVE_ROLE) == None:
-            interaction.guild.create_role(reason = "Creating role for the archives", name = "Archive")
+            await interaction.guild.create_role(reason = "Creating role for the archives", name = "Archive")
         
         # Create and send the Embed
         embed = discord.Embed(
