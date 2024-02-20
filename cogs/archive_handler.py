@@ -39,10 +39,17 @@ class ArchiveHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    # command to send the archive join message (/join_archive), should be
-    # locked to admin role
+    # Command to send the archive join message (/join_archive), should be
+    # locked to admin role (defualt is to roles that can both manage / create roles and pin messages).
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_roles = True, manage_messages = True)
     @app_commands.command(description="Sends the Archive joining message")
     async def join_archive(self, interaction: discord.Interaction) -> None:
+        # If we don't have an archive role in this server already, create one
+        if discord.utils.get(interaction.guild.roles, name=ARCHIVE_ROLE) == None:
+            interaction.guild.create_role(reason = "Creating role for the archives", name = "Archive")
+        
+        # Create and send the Embed
         embed = discord.Embed(
             title="The Archives",
             description="If you want to see all our old chatlogs from previous years, they are all available in our archive that is hidden by default. To view it, just press the button bellow this message!")

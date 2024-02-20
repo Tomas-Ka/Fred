@@ -6,6 +6,7 @@ class QuestInfo():
     # object.
     def __init__(
             self,
+            guild_id: int,
             quest_title: str,
             contractor: str,
             description: str,
@@ -15,6 +16,7 @@ class QuestInfo():
             quest_role_id: int,
             pin_message_id: int,
             players: str = None) -> None:
+        self.guild_id = guild_id
         self.quest_title = quest_title
         self.contractor = contractor
         self.description = description

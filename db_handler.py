@@ -1,7 +1,6 @@
 import asqlite
 from sqlite3 import Error
 import asyncio
-from typing import List, Tuple
 from helpers import QuestInfo
 
 
@@ -15,6 +14,7 @@ async def _create_tables() -> None:
     create_quests_table = """
     CREATE TABLE IF NOT EXISTS quests (
         "id" INTEGER PRIMARY KEY NOT NULL,
+        "guild_id" INTEGER NOT NULL,
         "quest_title" TEXT UNIQUE NOT NULL,
         "contractor" TEXT NOT NULL,
         "description" TEXT NOT NULL,
@@ -26,7 +26,7 @@ async def _create_tables() -> None:
         "players" BLOB
     );
     """
-    await _execute_query(create_quests_table, ())
+    await _execute_query(create_quests_table)
 
     create_stickies_table = """
     CREATE TABLE IF NOT EXISTS stickies (
@@ -34,25 +34,26 @@ async def _create_tables() -> None:
         "message_id" INTEGER UNIQUE
     );
     """
-    await _execute_query(create_stickies_table, ())
+    await _execute_query(create_stickies_table)
 
     create_players_table = """
     CREATE TABLE IF NOT EXISTS players (
-        "player_id" INTEGER UNIQUE,
+        "guild_id" INTEGER NOT NULL,
+        "player_id" INTEGER NOT NULL,
         "quests_completed" INTEGER
     );
     """
-    await _execute_query(create_players_table, ())
+    await _execute_query(create_players_table)
 
     print("all done, closing out!")
 
 
-async def _execute_query(query: str, vars: Tuple) -> None:
+async def _execute_query(query: str, vars: tuple = ()) -> None:
     """Execute the given query in the globally defined database.
 
     Args:
         query (str): The query string.
-        vars (Tuple): The vars to replace the spots in the queary string.
+        vars (tuple): The vars to replace the spots in the queary string.
     """
     async with asqlite.connect(db_file) as conn:
         async with conn.cursor() as cursor:
@@ -63,35 +64,37 @@ async def _execute_query(query: str, vars: Tuple) -> None:
                 print(f"the error {e} occured")
 
 
-async def _execute_multiple_read_query(query: List) -> List[Tuple]:
+async def _execute_multiple_read_query(query: list, vars: tuple = ()) -> list[tuple]:
     """Same as execute_query except it returns values,
     and is used for reading from the db.
 
     Args:
         query (str): The string to query the database with.
+        vars (tuple): The vars to replace the spots in the queary string.
 
     Returns:
-        List: a list containing all the data found from the query.
+        list: a list containing all the data found from the query.
     """
     async with asqlite.connect(db_file) as conn:
         async with conn.cursor() as cursor:
             result = None
             try:
-                await cursor.execute(query)
+                await cursor.execute(query, vars)
                 result = await cursor.fetchall()
                 return result
             except Error as e:
                 print(f"The error '{e}' occurred")
 
 
-async def _execute_read_query(query: List, vars: Tuple) -> Tuple:
+async def _execute_read_query(query: list, vars: tuple = ()) -> tuple:
     """Same as execute_read_query except it only returns a single value
 
     Args:
         query (str): The string to query the database with.
+        vars (tuple): The vars to replace the spots in the queary string.
 
     Returns:
-        Tuple: A Touple containing the data at the found row.
+        tuple: A Touple containing the data at the found row.
     """
     async with asqlite.connect(db_file) as conn:
         async with conn.cursor() as cursor:
@@ -129,30 +132,35 @@ async def get_quest(quest_id: int) -> QuestInfo:
     return None
 
 
-async def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
+async def get_quest_by_title(guild_id: int, quest_title: str) -> tuple[int, QuestInfo]:
     """Returns a tuple containing the quest id
     and a questInfo object, given a quest title.
 
     Args:
+        guild_id (int): The id of the discord guild to look for the quest in.
         quest_title (str): The quest name to get from the database.
 
     Returns:
-        Tuple[int, QuestInfo]: An object containing the data from the db.
+        tuple[int, QuestInfo]: An object containing the data from the db.
     """
     quest_query = """
     SELECT * FROM quests
-    WHERE quest_title = ?;"""
+    WHERE
+        quest_title = ?
+    AND
+        guild_id = ?;
+    """
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = await _execute_read_query(quest_query, (quest_title,))
+    query_return = await _execute_read_query(quest_query, (quest_title, guild_id,))
     if query_return:
         quest = QuestInfo(*query_return[1:])
         return (query_return[0], quest)
     return None
 
 
-async def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
+async def get_quest_by_thread_id(thread_id: int) -> tuple[int, QuestInfo]:
     """Returns a tuple containing the quest id
     and a questInfo object, given the id for the quest thread.
 
@@ -160,7 +168,7 @@ async def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
         thread_id (int): The thread id search for in the database.
 
     Returns:
-        Tuple[int, QuestInfo]: An object containing the data from the db.
+        tuple[int, QuestInfo]: An object containing the data from the db.
     """
     quest_query = """
     SELECT * FROM quests
@@ -179,18 +187,40 @@ async def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
     return None
 
 
-async def get_quest_list() -> List[QuestInfo]:
+async def get_quest_list(guild_id: int) -> list[QuestInfo]:
+    """Returns a list of all quests in the database
+
+    Args:
+        guild_id (int): The id of the discord guild to grab the quests for.
+
+    Returns:
+        list[QuestInfo]: The list of objects
+    """
+
+    quest_query = """
+    SELECT * FROM quests
+    WHERE guild_id = ?;
+    """
+
+    query_return = await _execute_multiple_read_query(quest_query, (guild_id,))
+    quests = []
+    if query_return:
+        for quest in query_return:
+            quests.append(QuestInfo(*quest[1:]))
+    return quests
+
+async def get_all_quest_list() -> list[QuestInfo]:
     """Returns a list of all quests in the database
 
     Returns:
-        List[QuestInfo]: The list of objects
+        list[QuestInfo]: The list of objects
     """
 
-    quest_querty = """
+    quest_query = """
     SELECT * FROM quests;
     """
 
-    query_return = await _execute_multiple_read_query(quest_querty)
+    query_return = await _execute_multiple_read_query(quest_query)
     quests = []
     if query_return:
         for quest in query_return:
@@ -208,16 +238,18 @@ async def create_quest(id: int, quest_info: QuestInfo) -> None:
     quest_add = """
     INSERT INTO
         quests (
-        id, quest_title, contractor,
+        id, guild_id,
+        quest_title, contractor,
         description, reward,
         embed_colour, thread_id,
         quest_role_id, pin_message_id
         )
     VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     """
     vars = (
         id,
+        quest_info.guild_id,
         quest_info.quest_title,
         quest_info.contractor,
         quest_info.description,
@@ -251,6 +283,8 @@ async def update_quest(id: int, quest_info: QuestInfo) -> None:
         players = ?
     WHERE
         id = ?
+    AND
+        guild_id = ?
     """
     vars = (
         quest_info.quest_title,
@@ -262,19 +296,28 @@ async def update_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.quest_role_id,
         quest_info.pin_message_id,
         quest_info.players,
-        id,)
+        id,
+        quest_info.guild_id,
+        )
 
     await _execute_query(quest_update, vars)
 
 
-async def del_quest_by_title(quest_title: str) -> None:
+async def del_quest_by_title(guild_id: int, quest_title: str) -> None:
     """Remove a quest from the db given a quest title.
 
     Args:
+        guild_id (int): The id of the discord guild to look for the quest in.
         quest_title (str): The title of the quest to remove.
     """
-    quest_del = "DELETE FROM quests WHERE quest_title = ?"
-    await _execute_query(quest_del, (quest_title,))
+    quest_del = """
+    DELETE FROM quests
+    WHERE
+        quest_title = ?
+    AND
+        guild_id = ?
+    """
+    await _execute_query(quest_del, (quest_title, guild_id,))
 
 
 async def del_quest(id: int) -> None:
@@ -304,11 +347,11 @@ async def get_sticky(channel_id: int) -> int:
     return (await _execute_read_query(sticky_query, (channel_id,)))[1]
 
 
-async def get_sticky_list() -> List[int]:
+async def get_sticky_list() -> list[int]:
     """Returns a list of all stickies in the database.
 
     Returns:
-        List[int]: A list of ids for the channels the stickies are in.
+        list[int]: A list of ids for the channels the stickies are in.
     """
     sticky_query = """
     SELECT * FROM stickies"""
@@ -358,11 +401,12 @@ async def del_sticky(channel_id: int):
     await _execute_query(sticky_del, (channel_id,))
 
 
-async def get_player(player_id: int) -> int:
+async def get_player(guild_id: int, player_id: int) -> int:
     """Gets a player and the amount of quests they've run, and if they aren't
     in the db, initialize them with 0 quests made.
 
     Args:
+        guild_id (int): The id of the discord guild to look for the player in.
         player_id (int): The id of the player to check.
 
     Returns:
@@ -370,29 +414,35 @@ async def get_player(player_id: int) -> int:
     """
     player_query = """
     SELECT quests_completed FROM players
-    WHERE player_id = ?;"""
+    WHERE
+        player_id = ?
+    AND
+        guild_id = ?;
+    """
 
-    query_return = await _execute_read_query(player_query, (player_id,))
+    query_return = await _execute_read_query(player_query, (player_id, guild_id,))
     if query_return is None:
         # The player doesn't exist in the db, let's add them
         player_add = """
         INSERT INTO
             players (
                 player_id,
+                guild_id,
                 quests_completed
             )
         VALUES
-            (?, ?);
+            (?, ?, ?);
         """
-        await _execute_query(player_add, (player_id, 0))
+        await _execute_query(player_add, (player_id, guild_id, 0))
         return 0
-    return query_return[0]
+    return query_return[1]
 
 
-async def update_player(player_id: int, quests_completed: int) -> None:
+async def update_player(guild_id: int, player_id: int, quests_completed: int) -> None:
     """Sets an entry in the db to a specific value.
 
     Args:
+        guild_id (int): The id of the discord guild to look for the player in.
         player_id (int): The player id of the row that should be updated.
         quests_completed (int): The amount of completed quests that should be entered.
     """
@@ -402,8 +452,10 @@ async def update_player(player_id: int, quests_completed: int) -> None:
             quests_completed = ?
         WHERE
             player_id = ?
+        AND
+            guild_id = ?
     """
-    await _execute_query(player_update, (quests_completed, player_id))
+    await _execute_query(player_update, (quests_completed, player_id, guild_id))
 
 
 if __name__ == "__main__":
