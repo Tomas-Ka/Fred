@@ -11,3 +11,5 @@ bin/
 lib/
 pyvenv.cfg
 share/
+db.sqlite
+
