@@ -1,30 +1,15 @@
-import sqlite3
-from sqlite3 import Connection, Error
+import asqlite
+from sqlite3 import Error
+import asyncio
 from typing import List, Tuple
 from helpers import QuestInfo
 
 
-def _create_connection(path) -> Connection:
-    """Creates a new connection to the database file and returns an object
-    we can use to get data from the db.
-
-    Args:
-        path (str or bytepath): Path to the databasefile
-
-    Returns:
-        Connection: Object that can be used to communicate with the database
-    """
-    connection = None
-    try:
-        connection = sqlite3.connect(path)
-        print("Connection to SQLite DB successful")
-    except Error as e:
-        print(f"The error '{e}' occurred")
-
-    return connection
+global db_file
+db_file = "db.sqlite"
 
 
-def _create_tables() -> None:
+async def _create_tables() -> None:
     """Initialization function to create the database if it doesn't exist yet.
     """
     create_quests_table = """
@@ -41,7 +26,7 @@ def _create_tables() -> None:
         "players" BLOB
     );
     """
-    _execute_query(connection, create_quests_table, ())
+    await _execute_query(create_quests_table, ())
 
     create_stickies_table = """
     CREATE TABLE IF NOT EXISTS stickies (
@@ -49,7 +34,7 @@ def _create_tables() -> None:
         "message_id" INTEGER UNIQUE
     );
     """
-    _execute_query(connection, create_stickies_table, ())
+    await _execute_query(create_stickies_table, ())
 
     create_players_table = """
     CREATE TABLE IF NOT EXISTS players (
@@ -57,71 +42,69 @@ def _create_tables() -> None:
         "quests_completed" INTEGER
     );
     """
+    await _execute_query(create_players_table, ())
 
-    _execute_query(connection, create_players_table, ())
+    print("all done, closing out!")
 
 
-def _execute_query(connection: Connection, query: str, vars: Tuple) -> None:
-    """Execute the given query with the given connection (database).
+async def _execute_query(query: str, vars: Tuple) -> None:
+    """Execute the given query in the globally defined database.
 
     Args:
-        connection (Connection): An sqlite3 database connecttion.
         query (str): The query string.
         vars (Tuple): The vars to replace the spots in the queary string.
     """
-    cursor = connection.cursor()
-    try:
-        cursor.execute(query, vars)
-        connection.commit()
-        # print("Query executed successfully")
-    except Error as e:
-        print(f"The error '{e}' occurred")
+    async with asqlite.connect(db_file) as conn:
+        async with conn.cursor() as cursor:
+            try:
+                await cursor.execute(query, vars)
+                await conn.commit()
+            except Error as e:
+                print(f"the error {e} occured")
 
 
-def _execute_multiple_read_query(
-        connection: Connection, query: List) -> List[Tuple]:
+async def _execute_multiple_read_query(query: List) -> List[Tuple]:
     """Same as execute_query except it returns values,
     and is used for reading from the db.
 
     Args:
-        connection (Connection): A connection to the database.
         query (str): The string to query the database with.
 
     Returns:
         List: a list containing all the data found from the query.
     """
-    cursor = connection.cursor()
-    result = None
-    try:
-        cursor.execute(query)
-        result = cursor.fetchall()
-        return result
-    except Error as e:
-        print(f"The error '{e}' occurred")
+    async with asqlite.connect(db_file) as conn:
+        async with conn.cursor() as cursor:
+            result = None
+            try:
+                await cursor.execute(query)
+                result = await cursor.fetchall()
+                return result
+            except Error as e:
+                print(f"The error '{e}' occurred")
 
 
-def _execute_read_query(connection: Connection,
-                        query: List, vars: Tuple) -> Tuple:
+async def _execute_read_query(query: List, vars: Tuple) -> Tuple:
     """Same as execute_read_query except it only returns a single value
 
     Args:
-        connection (Connection): A connection to the database.
         query (str): The string to query the database with.
 
     Returns:
         Tuple: A Touple containing the data at the found row.
     """
-    cursor = connection.cursor()
-    result = None
-    try:
-        cursor.execute(query, vars)
-        result = cursor.fetchone()
-        return result
-    except Error as e:
-        print(f"The error '{e}' occurred")
+    async with asqlite.connect(db_file) as conn:
+        async with conn.cursor() as cursor:
+            result = None
+            try:
+                await cursor.execute(query, vars)
+                result = await cursor.fetchone()
+                return result
+            except Error as e:
+                print(f"The error '{e}' occurred")
 
 
-def get_quest(quest_id: int) -> QuestInfo:
+async def get_quest(quest_id: int) -> QuestInfo:
     """Returns a quest given a quest id.
 
     Args:
@@ -136,7 +119,7 @@ def get_quest(quest_id: int) -> QuestInfo:
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = _execute_read_query(connection, quest_query, (quest_id,))
+    query_return = await _execute_read_query(quest_query, (quest_id,))
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
@@ -146,7 +129,7 @@ def get_quest(quest_id: int) -> QuestInfo:
     return None
 
 
-def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
+async def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
     """Returns a tuple containing the quest id
     and a questInfo object, given a quest title.
 
@@ -162,14 +145,14 @@ def get_quest_by_title(quest_title: str) -> Tuple[int, QuestInfo]:
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = _execute_read_query(connection, quest_query, (quest_title,))
+    query_return = await _execute_read_query(quest_query, (quest_title,))
     if query_return:
         quest = QuestInfo(*query_return[1:])
         return (query_return[0], quest)
     return None
 
 
-def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
+async def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
     """Returns a tuple containing the quest id
     and a questInfo object, given the id for the quest thread.
 
@@ -185,7 +168,7 @@ def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    query_return = _execute_read_query(connection, quest_query, (thread_id,))
+    query_return = await _execute_read_query(quest_query, (thread_id,))
 
     # The first value returned is the id of the quest, which we don't want to
     # parse
@@ -196,7 +179,7 @@ def get_quest_by_thread_id(thread_id: int) -> Tuple[int, QuestInfo]:
     return None
 
 
-def get_quest_list() -> List[QuestInfo]:
+async def get_quest_list() -> List[QuestInfo]:
     """Returns a list of all quests in the database
 
     Returns:
@@ -207,7 +190,7 @@ def get_quest_list() -> List[QuestInfo]:
     SELECT * FROM quests;
     """
 
-    query_return = _execute_multiple_read_query(connection, quest_querty)
+    query_return = await _execute_multiple_read_query(quest_querty)
     quests = []
     if query_return:
         for quest in query_return:
@@ -215,7 +198,7 @@ def get_quest_list() -> List[QuestInfo]:
     return quests
 
 
-def create_quest(id: int, quest_info: QuestInfo) -> None:
+async def create_quest(id: int, quest_info: QuestInfo) -> None:
     """Adds a quest to the db.
 
     Args:
@@ -244,10 +227,10 @@ def create_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.quest_role_id,
         quest_info.pin_message_id,)
 
-    _execute_query(connection, quest_add, vars)
+    await _execute_query(quest_add, vars)
 
 
-def update_quest(id: int, quest_info: QuestInfo) -> None:
+async def update_quest(id: int, quest_info: QuestInfo) -> None:
     """Updates an already existing quest by id.
 
     Args:
@@ -281,30 +264,30 @@ def update_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.players,
         id,)
 
-    _execute_query(connection, quest_update, vars)
+    await _execute_query(quest_update, vars)
 
 
-def del_quest_by_title(quest_title: str) -> None:
+async def del_quest_by_title(quest_title: str) -> None:
     """Remove a quest from the db given a quest title.
 
     Args:
         quest_title (str): The title of the quest to remove.
     """
     quest_del = "DELETE FROM quests WHERE quest_title = ?"
-    _execute_query(connection, quest_del, (quest_title,))
+    await _execute_query(quest_del, (quest_title,))
 
 
-def del_quest(id: int) -> None:
+async def del_quest(id: int) -> None:
     """Remove a quest from the db given an id.
 
     Args:
         id (int): The id of the quest to remove.
     """
     quest_del = "DELETE FROM quests WHERE id = ?"
-    _execute_query(connection, quest_del, (id,))
+    await _execute_query(quest_del, (id,))
 
 
-def get_sticky(channel_id: int) -> int:
+async def get_sticky(channel_id: int) -> int:
     """Returns a sticky given the id of the channel it's in.
 
     Args:
@@ -318,10 +301,10 @@ def get_sticky(channel_id: int) -> int:
     WHERE channel_id = ?"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    return _execute_read_query(connection, sticky_query, (channel_id,))[1]
+    return (await _execute_read_query(sticky_query, (channel_id,)))[1]
 
 
-def get_sticky_list() -> List[int]:
+async def get_sticky_list() -> List[int]:
     """Returns a list of all stickies in the database.
 
     Returns:
@@ -329,10 +312,10 @@ def get_sticky_list() -> List[int]:
     """
     sticky_query = """
     SELECT * FROM stickies"""
-    return _execute_multiple_read_query(connection, sticky_query)
+    return await _execute_multiple_read_query(sticky_query)
 
 
-def create_sticky(channel_id: int, message_id: int) -> None:
+async def create_sticky(channel_id: int, message_id: int) -> None:
     """Adds a new sticky to the database.
 
     Args:
@@ -345,10 +328,10 @@ def create_sticky(channel_id: int, message_id: int) -> None:
     VALUES
         (?, ?);
     """
-    _execute_query(connection, sticky_add, (channel_id, message_id,))
+    await _execute_query(sticky_add, (channel_id, message_id,))
 
 
-def update_sticky(channel_id: int, message_id: int) -> None:
+async def update_sticky(channel_id: int, message_id: int) -> None:
     """Updates the sticky in a certain channel to another message.
 
     Args:
@@ -362,20 +345,20 @@ def update_sticky(channel_id: int, message_id: int) -> None:
     WHERE
         channel_id = ?
     """
-    _execute_query(connection, sticky_update, (message_id, channel_id,))
+    await _execute_query(sticky_update, (message_id, channel_id,))
 
 
-def del_sticky(channel_id: int):
+async def del_sticky(channel_id: int):
     """Remove a sticky from the db given a channel id
 
     Args:
         channel_id (int): The Id of the channel to remove the sticky from
     """
     sticky_del = "DELETE FROM stickies WHERE channel_id = ?"
-    _execute_query(connection, sticky_del, (channel_id,))
+    await _execute_query(sticky_del, (channel_id,))
 
 
-def get_player(player_id: int) -> int:
+async def get_player(player_id: int) -> int:
     """Gets a player and the amount of quests they've run, and if they aren't
     in the db, initialize them with 0 quests made.
 
@@ -389,7 +372,7 @@ def get_player(player_id: int) -> int:
     SELECT quests_completed FROM players
     WHERE player_id = ?;"""
 
-    query_return = _execute_read_query(connection, player_query, (player_id,))
+    query_return = await _execute_read_query(player_query, (player_id,))
     if query_return is None:
         # The player doesn't exist in the db, let's add them
         player_add = """
@@ -401,12 +384,12 @@ def get_player(player_id: int) -> int:
         VALUES
             (?, ?);
         """
-        _execute_query(connection, player_add, (player_id, 0))
+        await _execute_query(player_add, (player_id, 0))
         return 0
     return query_return[0]
 
 
-def update_player(player_id: int, quests_completed: int) -> None:
+async def update_player(player_id: int, quests_completed: int) -> None:
     """Sets an entry in the db to a specific value.
 
     Args:
@@ -420,12 +403,9 @@ def update_player(player_id: int, quests_completed: int) -> None:
         WHERE
             player_id = ?
     """
-    _execute_query(connection, player_update, (quests_completed, player_id))
-
-
-global connection
-connection = _create_connection("db.sqlite")
+    await _execute_query(player_update, (quests_completed, player_id))
 
 
 if __name__ == "__main__":
-    _create_tables()
+    print("Creating tables if they don't exist")
+    asyncio.run(_create_tables())

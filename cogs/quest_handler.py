@@ -20,8 +20,12 @@ FILE_LOCATION = "."
 # --------------------PERSISTENT VIEWS--------------------
 class PersistentQuestJoinView(discord.ui.View):
     # View for the join quest button.
-    def __init__(self, info: QuestInfo, disabled: bool = False) -> None:
-        self.quest_id = db.get_quest_by_title(info.quest_title)[0]
+    def __init__(
+            self,
+            info: QuestInfo,
+            quest_id=int,
+            disabled: bool = False) -> None:
+        self.quest_id = quest_id
         self.info = info
         # create the button here since I need access to self.info for the
         # custom_id.
@@ -66,10 +70,10 @@ class PersistentQuestJoinView(discord.ui.View):
         namestring = ""
         for player_id in self.info._players:
             name = interaction.guild.get_member(player_id).display_name
-            quests_played = db.get_player(player_id)
+            quests_played = await db.get_player(player_id)
             namestring += f"`{name}`: {quests_played}\n"
         await interaction.channel.get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
-        db.update_quest(self.quest_id, self.info)
+        await db.update_quest(self.quest_id, self.info)
 
 
 # ------------------------MODALS--------------------------
@@ -149,10 +153,11 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
                           quest_role.id,
                           pin_message.id)
 
-        db.create_quest(msg.id, quest)
+        await db.create_quest(msg.id, quest)
 
         # set the quest join button to appear under the joined players list
-        await pin_message.edit(view=PersistentQuestJoinView(quest))
+        quest_id = (await db.get_quest_by_title(quest.quest_title))[0]
+        await pin_message.edit(view=PersistentQuestJoinView(quest, quest_id))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -164,10 +169,11 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
 class EditQuest(discord.ui.Modal, title="Edit Quest"):
     # The modal that shows up when you want to edit a quest.
-    def __init__(self, message: discord.Message) -> None:
+    def __init__(self, message: discord.Message,
+                 quest_info: QuestInfo) -> None:
         super().__init__()
         self.message = message
-        self.quest_info: QuestInfo = db.get_quest(self.message.id)
+        self.quest_info = quest_info
         self.quest_title.default = self.quest_info.quest_title
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
@@ -241,8 +247,9 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           self.quest_info.pin_message_id,
                           self.quest_info.players
                           )
-        db.update_quest(self.message.id, quest)
-        await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=PersistentQuestJoinView(quest))
+        await db.update_quest(self.message.id, quest)
+        quest_id = (await db.get_quest_by_title(quest.quest_title))[0]
+        await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=PersistentQuestJoinView(quest, quest_id))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
@@ -254,10 +261,11 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
 
 class DelQuest(discord.ui.Modal, title="Delete Quest"):
     # The confirmation modal that shows up when you want to delete a quest.
-    def __init__(self, message: discord.Message) -> None:
+    def __init__(self, message: discord.Message,
+                 quest_info: QuestInfo) -> None:
         super().__init__()
         self.message = message
-        self.quest_info: QuestInfo = db.get_quest(self.message.id)
+        self.quest_info = quest_info
         if len(self.quest_info.quest_title) < 16:
             self.title = f"Delete Quest {self.quest_info.quest_title}"
             self.confirmation.label = f'Type questname: "{self.quest_info.quest_title}" to confirm'
@@ -314,7 +322,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
         await interaction.guild.get_role(self.quest_info.quest_role_id).delete()
 
         # del quest
-        db.del_quest(self.message.id)
+        await db.del_quest(self.message.id)
 
         await interaction.response.send_message(f"Quest {self.quest_info.quest_title} removed!", ephemeral=True)
 
@@ -323,8 +331,9 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await self.message.delete()
         # otherwise, disable the join quest button
         else:
+            quest_id = (await db.get_quest_by_title(self.quest_info.quest_title))[0]
             disabled_view = PersistentQuestJoinView(
-                self.quest_info, disabled=True)
+                self.quest_info, quest_id, disabled=True)
             await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=disabled_view)
             # stop the persistent view to stop wasting resources
             disabled_view.stop()
@@ -339,11 +348,11 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
 class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
     # The modal that lets you set the amount of quests played by a certain
     # player.
-    def __init__(self, user=discord.Member):
+    def __init__(self, user: discord.Member, current_quest_run: int):
         super().__init__()
         self.user = user
         self.player.label = f'{user.display_name} quest count:'
-        self.player.default = db.get_player(user.id)
+        self.player.default = current_quest_run
 
     player = discord.ui.TextInput(
         style=discord.TextStyle.short,
@@ -353,7 +362,7 @@ class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
             amount = int(self.player.value)
-            db.update_player(self.user.id, amount)
+            await db.update_player(self.user.id, amount)
             await interaction.response.send_message(f"Updated amount of quests for player {self.user.display_name} to be {self.player.value}")
         except ValueError:
             await interaction.response.send_message(f'"{self.player.value}" is not a number')
@@ -412,7 +421,7 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             user (discord.Member): The user who the command should run on, is also passed automatically.
         """
-        quests = db.get_player(user.id)
+        quests = await db.get_player(user.id)
         await interaction.response.send_message(f"{user.display_name} has played {quests} quests")
 
     async def set_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
@@ -422,7 +431,8 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically
             user (discord.Member): The user who the commmand should un on, is also passed automatically.
         """
-        await interaction.response.send_modal(SetQuestAmount(user))
+        current_quests_run = await db.get_player(user.id)
+        await interaction.response.send_modal(SetQuestAmount(user, current_quests_run))
 
     @app_commands.command(
         description="Increments the quest played count for all players in the thread")
@@ -434,16 +444,17 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
         """
         if interaction.channel.type == discord.ChannelType.public_thread:
-                quest_info = db.get_quest_by_thread_id(interaction.channel.id)
-                # check to see if return is empty (aka the quest doesn't exist in the database)
-                if quest_info != None:
-                    quest_info = quest_info[1]
-                else:
-                    await interaction.response.send_message("Error\nThis is not a quest thread", ephemeral=True)
-                    return
-                
-                embed = await _get_all_quests_played(interaction.channel, quest_info, True)
-                await interaction.response.send_message(embed=embed)
+            quest_info = await db.get_quest_by_thread_id(interaction.channel.id)
+            # check to see if return is empty (aka the quest doesn't exist in
+            # the database)
+            if quest_info is not None:
+                quest_info = quest_info[1]
+            else:
+                await interaction.response.send_message("Error\nThis is not a quest thread", ephemeral=True)
+                return
+
+            embed = await _get_all_quests_played(interaction.channel, quest_info, True)
+            await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message("Error\nThis is not a quest thread", ephemeral=True)
 
@@ -454,11 +465,13 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             message (discord.Message): The quest message the command should run on, also passed automatically.
         """
-        if (db.get_quest(message.id) == None):
-            # quest does not exist, so we can return an error and skip the modal
+        quest = await db.get_quest(message.id)
+        if (quest is None):
+            # quest does not exist, so we can return an error and skip the
+            # modal
             await interaction.response.send_message("Error\nThe selected message is not a quest message", ephemeral=True)
             return
-        await interaction.response.send_modal(EditQuest(message))
+        await interaction.response.send_modal(EditQuest(message, quest))
 
     async def del_quest(self, interaction: discord.Interaction, message: discord.Message) -> None:
         """Command to delete quest from memory and storage (right click and del_quest),
@@ -468,12 +481,14 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             message (discord.Message): The quest message the command should run on, also passed automatically.
         """
-        if (db.get_quest(message.id) == None):
-            # quest does not exist, so we can return an error and skip the modal
+        quest = await db.get_quest(message.id)
+        if (quest is None):
+            # quest does not exist, so we can return an error and skip the
+            # modal
             await interaction.response.send_message("Error\nThe selected message is not a quest message", ephemeral=True)
             return
 
-        await interaction.response.send_modal(DelQuest(message))
+        await interaction.response.send_modal(DelQuest(message, quest))
 
 
 # ---------------------OTHER FUNCTIONS--------------------
@@ -530,10 +545,10 @@ async def _get_all_quests_played(channel, quest_info: QuestInfo = None, incremen
         if player_role not in player.roles:
             continue
         if increment:
-            quests_played = db.get_player(player.id) + 1
-            db.update_player(player.id, quests_played)
+            quests_played = await db.get_player(player.id) + 1
+            await db.update_player(player.id, quests_played)
         else:
-            quests_played = db.get_player(player.id)
+            quests_played = await db.get_player(player.id)
 
         players[player] = quests_played
         namestring += f"{player.display_name}: {quests_played}\n"
@@ -555,9 +570,10 @@ async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
 
     print("\t\tQuests in database:")
-    quests = db.get_quest_list()
+    quests = await db.get_quest_list()
     for quest in quests:
-        bot.add_view(PersistentQuestJoinView(quest))
+        quest_id = (await db.get_quest_by_title(quest.quest_title))[0]
+        bot.add_view(PersistentQuestJoinView(quest, quest_id))
         print(f"\t\t\t{quest.quest_title}")
     if not quests:
         print(f"\t\t\tNo quests in db!")
