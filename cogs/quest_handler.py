@@ -70,7 +70,7 @@ class PersistentQuestJoinView(discord.ui.View):
         namestring = ""
         for player_id in self.info._players:
             name = interaction.guild.get_member(player_id).display_name
-            quests_played = await db.get_player(player_id)
+            quests_played = await db.get_player(interaction.guild_id, player_id)
             namestring += f"`{name}`: {quests_played}\n"
         await interaction.channel.get_partial_message(self.info.pin_message_id).edit(embed=discord.Embed(title="Players:", description=namestring, color=discord.Color.from_str(self.info.embed_colour)))
         await db.update_quest(self.quest_id, self.info)
@@ -108,12 +108,45 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         # create embed for the message (with error handling for the colour
-        # selection).
+        # selection and checking if we already have a quest with the same name).
         try:
-            embed_colour = webcolors.name_to_hex(self.embed_colour.value)
+            raw_colour_value = self.embed_colour.value
+            embed_colour = webcolors.name_to_hex(raw_colour_value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
-            await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
+            message = f"""Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.
+            
+            Here is your quest info:
+            
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {raw_colour_value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
+            return
+        
+        if await db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
+            message = f"""The quest name "{self.quest_title.value}" is already in use, please try another name
+            
+            Here is your quest info:
+
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {raw_colour_value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
             return
 
         embed = discord.Embed(
@@ -134,7 +167,12 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
 
         # send the actual message with the quest info
-        msg = await interaction.channel.send(content=f'<@&{discord.utils.get(interaction.guild.roles, name="Player").id}>', embed=embed)
+        # (Check that the player role exists before we ping it):
+        player_role = discord.utils.get(interaction.guild.roles, name="Player")
+        if player_role:
+            msg = await interaction.channel.send(content=f'<@&{player_role.id}>', embed=embed)
+        else:
+            msg = await interaction.channel.send(content="", embed=embed)
 
         # create & attatch the thread to the newly created quest info message
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
@@ -144,7 +182,8 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         await pin_message.pin()
 
         # update the QuestInfo in memory
-        quest = QuestInfo(self.quest_title.value,
+        quest = QuestInfo(interaction.guild_id,
+                          self.quest_title.value,
                           self.contractor.value,
                           self.description.value,
                           self.reward.value,
@@ -156,12 +195,29 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         await db.create_quest(msg.id, quest)
 
         # set the quest join button to appear under the joined players list
-        quest_id = (await db.get_quest_by_title(quest.quest_title))[0]
+        quest_id = (await db.get_quest_by_title(interaction.guild_id, quest.quest_title))[0]
         await pin_message.edit(view=PersistentQuestJoinView(quest, quest_id))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
-        await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
+        try:
+            message = f"""Something went wrong, please try again.
+            
+            Here is your quest info:
+
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {self.embed_colour.value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
 
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
@@ -175,6 +231,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         self.message = message
         self.quest_info = quest_info
         self.quest_title.default = self.quest_info.quest_title
+        self.old_title = self.quest_info.quest_title
         self.contractor.default = self.quest_info.contractor
         self.description.default = self.quest_info.description
         self.reward.default = self.quest_info.reward
@@ -211,13 +268,51 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         thread_id = self.quest_info.thread_id
         quest_role_id = self.quest_info.quest_role_id
+        
+        # Checking to make sure our inputs are valid:
 
         try:
-            self.embed_colour = webcolors.name_to_hex(self.embed_colour.value)
+            raw_colour_value = self.embed_colour.value
+            self.embed_colour = webcolors.name_to_hex(raw_colour_value)
         except ValueError:
             # error handling for misspellt or non-existing colour name
-            await interaction.response.send_message(f'Colour name "{self.embed_colour.value}" either non-existent or misspellt, please try again', ephemeral=True)
+            message = f"""Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.
+            
+            Here is your quest info:
+            
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {raw_colour_value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
             return
+        
+        if not self.quest_title.value == self.old_title:
+            if await db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
+                message = f"""The quest name "{self.quest_title.value}" is already in use, please try another name
+                
+                Here is your quest info:
+
+                **Title:** {self.quest_title.value}
+
+                **Contractor:** {self.contractor.value}
+
+                **Description:** {self.description.value}
+
+                **Reward:** {self.reward.value}
+
+                **Colour:** {raw_colour_value}"""
+
+                await interaction.response.send_message(message, ephemeral=True)
+                return
+
+
         embed = discord.Embed(
             title=self.quest_title.value,
             description=self.description.value,
@@ -230,14 +325,21 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
             value=self.contractor.value,
             inline=True)
         embed.add_field(name="Reward", value=self.reward.value, inline=True)
-        await self.message.edit(content=f'<@&{discord.utils.get(interaction.guild.roles, name="Player").id}>', embed=embed)
+
+        # Check that the player role exists before we ping it:
+        player_role = discord.utils.get(interaction.guild.roles, name="Player")
+        if player_role:
+            await self.message.edit(content=f'<@&{player_role.id}>', embed=embed)
+        else:
+            await self.message.edit(content="", embed=embed)
 
         # edit thread and role names
         thread = self.message.channel.get_thread(thread_id)
         await thread.edit(name=self.quest_title.value)
         await self.message.guild.get_role(quest_role_id).edit(name=self.quest_title.value)
 
-        quest = QuestInfo(self.quest_title.value,
+        quest = QuestInfo(interaction.guild_id,
+                          self.quest_title.value,
                           self.contractor.value,
                           self.description.value,
                           self.reward.value,
@@ -248,12 +350,29 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           self.quest_info.players
                           )
         await db.update_quest(self.message.id, quest)
-        quest_id = (await db.get_quest_by_title(quest.quest_title))[0]
+        quest_id = (await db.get_quest_by_title(interaction.guild_id, quest.quest_title))[0]
         await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=PersistentQuestJoinView(quest, quest_id))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
-        await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
+        try:
+            message = f"""Something went wrong, please try again.
+            
+            Here is your quest info:
+
+            **Title:** {self.quest_title.value}
+
+            **Contractor:** {self.contractor.value}
+
+            **Description:** {self.description.value}
+
+            **Reward:** {self.reward.value}
+
+            **Colour:** {self.embed_colour.value}"""
+
+            await interaction.response.send_message(message, ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message("Something went wrong, please try again.", ephemeral=True)
 
         # make sure we know what the error is
         traceback.print_tb(error.__traceback__)
@@ -331,7 +450,7 @@ class DelQuest(discord.ui.Modal, title="Delete Quest"):
             await self.message.delete()
         # otherwise, disable the join quest button
         else:
-            quest_id = (await db.get_quest_by_title(self.quest_info.quest_title))[0]
+            quest_id = (await db.get_quest_by_title(interaction.guild_id, self.quest_info.quest_title))[0]
             disabled_view = PersistentQuestJoinView(
                 self.quest_info, quest_id, disabled=True)
             await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=disabled_view)
@@ -362,7 +481,7 @@ class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
             amount = int(self.player.value)
-            await db.update_player(self.user.id, amount)
+            await db.update_player(interaction.guild_id, self.user.id, amount)
             await interaction.response.send_message(f"Updated amount of quests for player {self.user.display_name} to be {self.player.value}")
         except ValueError:
             await interaction.response.send_message(f'"{self.player.value}" is not a number')
@@ -387,12 +506,24 @@ class QuestHandler(commands.Cog):
             name="Get quests played", callback=self.get_quests_played)
         self.ctx_set_quests_played = app_commands.ContextMenu(
             name="Set quests played", callback=self.set_quests_played)
+        
+        self.ctx_edit_quest.guild_only = True
+        self.ctx_del_quest.guild_only = True
+        self.ctx_get_quests_played.guild_only = True
+        self.ctx_set_quests_played.guild_only = True
+
+        self.ctx_edit_quest.default_permissions = discord.Permissions(manage_events = True, manage_messages = True, create_public_threads = True)
+        self.ctx_del_quest.default_permissions = discord.Permissions(manage_events = True, manage_messages = True, create_public_threads = True)
+
+        self.ctx_set_quests_played.default_permissions = discord.Permissions(manage_events = True, manage_messages = True, create_public_threads = True)
 
         self.bot.tree.add_command(self.ctx_edit_quest)
         self.bot.tree.add_command(self.ctx_del_quest)
         self.bot.tree.add_command(self.ctx_get_quests_played)
         self.bot.tree.add_command(self.ctx_set_quests_played)
 
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_events = True, manage_messages = True, create_public_threads = True)
     @app_commands.command(description="Make a Quest")
     async def create_quest(self, interaction: discord.Interaction) -> None:
         """Command to create a new quest (/create_quest), should be locked to DM role.
@@ -402,6 +533,8 @@ class QuestHandler(commands.Cog):
         """
         await interaction.response.send_modal(CreateQuest())
 
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_events = True, manage_messages = True, create_public_threads = True)
     @app_commands.command(
         description="Get amount of quests played for all users in the channel")
     async def get_all_quests_played(self, interaction: discord.Interaction) -> None:
@@ -421,7 +554,7 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically.
             user (discord.Member): The user who the command should run on, is also passed automatically.
         """
-        quests = await db.get_player(user.id)
+        quests = await db.get_player(interaction.guild_id, user.id)
         await interaction.response.send_message(f"{user.display_name} has played {quests} quests")
 
     async def set_quests_played(self, interaction: discord.Interaction, user: discord.Member) -> None:
@@ -431,9 +564,10 @@ class QuestHandler(commands.Cog):
             interaction (discord.Interaction): The discord interaction obj that is passed automatically
             user (discord.Member): The user who the commmand should un on, is also passed automatically.
         """
-        current_quests_run = await db.get_player(user.id)
+        current_quests_run = await db.get_player(interaction.guild_id, user.id)
         await interaction.response.send_modal(SetQuestAmount(user, current_quests_run))
 
+    @app_commands.default_permissions(manage_events = True, manage_messages = True, create_public_threads = True)
     @app_commands.command(
         description="Increments the quest played count for all players in the thread")
     async def update_quest_count(self, interaction: discord.Interaction) -> None:
@@ -492,7 +626,7 @@ class QuestHandler(commands.Cog):
 
 
 # ---------------------OTHER FUNCTIONS--------------------
-async def _get_all_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+async def _get_all_quests_played(channel: discord.TextChannel | discord.Thread, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
     May cause fred to hit a rate limit if used too much, handle with care.
 
@@ -545,10 +679,10 @@ async def _get_all_quests_played(channel, quest_info: QuestInfo = None, incremen
         if player_role not in player.roles:
             continue
         if increment:
-            quests_played = await db.get_player(player.id) + 1
-            await db.update_player(player.id, quests_played)
+            quests_played = await db.get_player(channel.guild.id, player.id) + 1
+            await db.update_player(channel.guild.id, player.id, quests_played)
         else:
-            quests_played = await db.get_player(player.id)
+            quests_played = await db.get_player(channel.guild.id, player.id)
 
         players[player] = quests_played
         namestring += f"{player.display_name}: {quests_played}\n"
@@ -570,9 +704,9 @@ async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
 
     print("\t\tQuests in database:")
-    quests = await db.get_quest_list()
+    quests = await db.get_all_quest_list()
     for quest in quests:
-        quest_id = (await db.get_quest_by_title(quest.quest_title))[0]
+        quest_id = (await db.get_quest_by_title(quest.guild_id, quest.quest_title))[0]
         bot.add_view(PersistentQuestJoinView(quest, quest_id))
         print(f"\t\t\t{quest.quest_title}")
     if not quests:

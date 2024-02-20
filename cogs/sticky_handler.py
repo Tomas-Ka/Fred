@@ -40,6 +40,8 @@ class StickyHandler(commands.Cog):
         # write the changes to disk.
         await db.update_sticky(msg.channel.id, new_sticky.id)
 
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_messages = True)
     @app_commands.command(description="Creates the New Character sticky in a channel")
     async def new_char_sticky(self, interaction: discord.Interaction) -> None:
         """Discord command (/new_char_sticky) that creates a new-character
@@ -62,6 +64,8 @@ class StickyHandler(commands.Cog):
             self.sticky_channels.append(interaction.channel.id)
             await interaction.response.send_message(f"Sticky created in channel: {interaction.channel.name}", ephemeral=True)
 
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_messages = True)
     @app_commands.command(description="Removes the New Character sticky from a channel")
     @app_commands.describe(del_sticky="Should the old sticky message be removed?")
     async def unsubscribe_new_char_sticky(self, interaction: discord.Interaction, del_sticky: Optional[bool] = False) -> None:
