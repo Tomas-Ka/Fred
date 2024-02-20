@@ -301,7 +301,7 @@ async def get_sticky(channel_id: int) -> int:
     WHERE channel_id = ?"""
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db
-    return await _execute_read_query(sticky_query, (channel_id,))[1]
+    return (await _execute_read_query(sticky_query, (channel_id,)))[1]
 
 
 async def get_sticky_list() -> List[int]:

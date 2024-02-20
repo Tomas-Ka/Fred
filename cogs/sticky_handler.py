@@ -34,10 +34,11 @@ class StickyHandler(commands.Cog):
         sticky_embed.set_footer(text="Stickied by Nat 1 Fred")
         # send the new sticky and delete the old one
         new_sticky = await msg.channel.send(embed=sticky_embed)
-        await msg.channel.get_partial_message(db.get_sticky(msg.channel.id)).delete()
+        sticky_id = await db.get_sticky(msg.channel.id)
+        await msg.channel.get_partial_message(sticky_id).delete()
         # proces the data of the sticky (update references and the like), and
         # write the changes to disk.
-        db.update_sticky(msg.channel.id, new_sticky.id)
+        await db.update_sticky(msg.channel.id, new_sticky.id)
 
     @app_commands.command(description="Creates the New Character sticky in a channel")
     async def new_char_sticky(self, interaction: discord.Interaction) -> None:
@@ -57,7 +58,7 @@ class StickyHandler(commands.Cog):
         else:
             # if it doesn't exist, create a new sticky and add it to the db
             new_sticky = await interaction.channel.send(embed=sticky_embed)
-            db.create_sticky(interaction.channel.id, new_sticky.id)
+            await db.create_sticky(interaction.channel.id, new_sticky.id)
             self.sticky_channels.append(interaction.channel.id)
             await interaction.response.send_message(f"Sticky created in channel: {interaction.channel.name}", ephemeral=True)
 
@@ -77,8 +78,9 @@ class StickyHandler(commands.Cog):
             # if del_sticky flag is set, delete message, else just delete the
             # database entry
             if del_sticky:
-                await interaction.channel.get_partial_message(db.get_sticky(interaction.channel.id)).delete()
-            db.del_sticky(interaction.channel.id)
+                sticky_id = await db.get_sticky(interaction.channel.id)
+                await interaction.channel.get_partial_message(sticky_id).delete()
+            await db.del_sticky(interaction.channel.id)
             self.sticky_channels.remove(interaction.channel.id)
             await interaction.response.send_message("Sticky has been deleted" if del_sticky else "Sticky has been unsubscribed", ephemeral=True)
         else:
