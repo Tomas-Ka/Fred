@@ -30,7 +30,7 @@ class QuestInfo():
         else:
             self._players = []
 
-    # ToDo; This property tag might be superfluous, or this entire system could be reworked to all be properties of the same class
+    # Todo; This property tag might be superfluous, or this entire system could be reworked to all be properties of the same class
     #       take a look at this later.
     @property
     def players(self) -> str:

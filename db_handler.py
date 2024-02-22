@@ -121,11 +121,11 @@ async def get_quest(quest_id: int) -> QuestInfo:
     WHERE id = ?;"""
 
     # This returns a list and we take the first object as there should only
-    # ever be one due to unique constraints in the db
+    # ever be one due to unique constraints in the db.
     query_return = await _execute_read_query(quest_query, (quest_id,))
 
     # The first value returned is the id of the quest, which we don't want to
-    # parse
+    # parse.
     if query_return:
         quest = QuestInfo(*query_return[1:])
         return quest
@@ -152,7 +152,7 @@ async def get_quest_by_title(guild_id: int, quest_title: str) -> tuple[int, Ques
     """
 
     # This returns a list and we take the first object as there should only
-    # ever be one due to unique constraints in the db
+    # ever be one due to unique constraints in the db.
     query_return = await _execute_read_query(quest_query, (quest_title, guild_id,))
     if query_return:
         quest = QuestInfo(*query_return[1:])
@@ -175,11 +175,11 @@ async def get_quest_by_thread_id(thread_id: int) -> tuple[int, QuestInfo]:
     WHERE thread_id = ?;"""
 
     # This returns a list and we take the first object as there should only
-    # ever be one due to unique constraints in the db
+    # ever be one due to unique constraints in the db.
     query_return = await _execute_read_query(quest_query, (thread_id,))
 
     # The first value returned is the id of the quest, which we don't want to
-    # parse
+    # parse.
 
     if query_return:
         quest = QuestInfo(*query_return[1:])
@@ -208,6 +208,7 @@ async def get_quest_list(guild_id: int) -> list[QuestInfo]:
         for quest in query_return:
             quests.append(QuestInfo(*quest[1:]))
     return quests
+
 
 async def get_all_quest_list() -> list[QuestInfo]:
     """Returns a list of all quests in the database
@@ -298,7 +299,7 @@ async def update_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.players,
         id,
         quest_info.guild_id,
-        )
+    )
 
     await _execute_query(quest_update, vars)
 
@@ -343,7 +344,7 @@ async def get_sticky(channel_id: int) -> int:
     SELECT * FROM stickies
     WHERE channel_id = ?"""
     # This returns a list and we take the first object as there should only
-    # ever be one due to unique constraints in the db
+    # ever be one due to unique constraints in the db.
     return (await _execute_read_query(sticky_query, (channel_id,)))[1]
 
 
@@ -422,7 +423,7 @@ async def get_player(guild_id: int, player_id: int) -> int:
 
     query_return = await _execute_read_query(player_query, (player_id, guild_id,))
     if query_return is None:
-        # The player doesn't exist in the db, let's add them
+        # The player doesn't exist in the db, let's add them.
         player_add = """
         INSERT INTO
             players (

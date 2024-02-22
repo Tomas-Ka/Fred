@@ -1,5 +1,4 @@
 # -*- coding: UTF-8 -*-
-# traceback is for error logging
 import traceback
 from os import environ
 
@@ -18,7 +17,7 @@ token = environ["TOKEN"]
 # -----------------------MAIN CLASS-----------------------
 class FredBot(commands.Bot):
     def __init__(self, command_prefix: str) -> None:
-        # set up intents and initialize the bot
+        # Set up intents and initialize the bot.
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
@@ -35,9 +34,9 @@ class FredBot(commands.Bot):
         print('------')
 
     async def setup_hook(self) -> None:
-        # do any data processing to get data into memory here
+        # Do any data processing to get data into memory here:
 
-        # load cogs:
+        # Load cogs:
         print("loading cogs:")
         extensions = [
             'cogs.dice_roller',
@@ -55,7 +54,7 @@ class FredBot(commands.Bot):
                 print(f'Failed to load extension {extension}.')
                 traceback.print_exc()
 
-        # sync app commands with Discord
+        # Sync app commands with Discord:
         # await self.tree.sync()
         # self.tree.copy_global_to(guild=TEST_GUILD)
         # await self.tree.sync(guild=TEST_GUILD)

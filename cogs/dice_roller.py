@@ -35,7 +35,7 @@ class DiceRoller(commands.Cog):
 
         for result in re_input:
             if result[3] == "" and result[4] == "":
-                # dice roll
+                # Dice roll:
                 try:
                     amount = int(result[1])
                     sides = int(result[2])
@@ -71,7 +71,7 @@ class DiceRoller(commands.Cog):
 
                 rolls.append(DieResults(sides, amount, die_rolls))
             else:
-                # modifier
+                # Modifier:
                 try:
                     val = int(result[3] + result[4])
                 except ValueError:
@@ -113,7 +113,7 @@ class DiceRoller(commands.Cog):
             modifiers = modifiers[0:-2]
             embed.add_field(name="modifiers", value=modifiers, inline=False)
         embed.add_field(name="Total", value=total, inline=False)
-        # length of "total" is 5, and of "modifiers" is 9
+        # Length of "total" is 5, and of "modifiers" is 9.
         embed_length = embed_length + 5 + 9 + total + len(modifiers)
 
         if embed_length > 6000:
@@ -124,7 +124,7 @@ class DiceRoller(commands.Cog):
 
 # ----------------------MAIN PROGRAM----------------------
 # This setup is required for the cog to setup and run,
-# and is run when the cog is loaded with bot.load_extensions()
+# and is run when the cog is loaded with bot.load_extensions().
 async def setup(bot: commands.Bot) -> None:
     print("\tcogs.dice_roller begin loading")
     await bot.add_cog(DiceRoller(bot))
