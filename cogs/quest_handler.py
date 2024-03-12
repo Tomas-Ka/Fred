@@ -90,7 +90,8 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
     contractor = discord.ui.TextInput(
         label="Contractor",
-        placeholder="In game questgiver here..."
+        placeholder="In game questgiver here...",
+        required=False
     )
 
     description = discord.ui.TextInput(
@@ -102,7 +103,8 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
     reward = discord.ui.TextInput(
         label="Reward",
-        placeholder="Quest reward here..."
+        placeholder="Quest reward here...",
+        required=False
     )
 
     embed_colour = discord.ui.TextInput(
@@ -161,14 +163,23 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
             description=self.description.value,
             color=discord.Color.from_str(
                 embed_colour))
+
         embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.avatar.url)
-        embed.add_field(
-            name="Contractor",
-            value=self.contractor.value,
-            inline=True)
-        embed.add_field(name="Reward", value=self.reward.value, inline=True)
+
+        # If contractor or reward fields are empty, skip adding them
+        if self.contractor.value:
+            embed.add_field(
+                name="Contractor",
+                value=self.contractor.value,
+                inline=True)
+
+        if self.reward.value:
+            embed.add_field(
+                name="Reward",
+                value=self.reward.value,
+                inline=True)
 
         # Create the quest role with the name of the quest title.
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
@@ -252,7 +263,8 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
 
     contractor = discord.ui.TextInput(
         label="Contractor",
-        placeholder="In game questgiver here..."
+        placeholder="In game questgiver here...",
+        required=False
     )
 
     description = discord.ui.TextInput(
@@ -264,7 +276,8 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
 
     reward = discord.ui.TextInput(
         label="Reward",
-        placeholder="Quest reward here..."
+        placeholder="Quest reward here...",
+        required=False
     )
 
     embed_colour = discord.ui.TextInput(
@@ -325,14 +338,23 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
             title=self.quest_title.value,
             description=self.description.value,
             color=discord.Color.from_str(self.embed_colour))
+
         embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.avatar.url)
-        embed.add_field(
-            name="Contractor",
-            value=self.contractor.value,
-            inline=True)
-        embed.add_field(name="Reward", value=self.reward.value, inline=True)
+
+        # If contractor or reward fields are empty, skip adding them
+        if self.contractor.value:
+            embed.add_field(
+                name="Contractor",
+                value=self.contractor.value,
+                inline=True)
+
+        if self.reward.value:
+            embed.add_field(
+                name="Reward",
+                value=self.reward.value,
+                inline=True)
 
         # Check that the player role exists before we ping it:
         player_role = discord.utils.get(interaction.guild.roles, name="Player")

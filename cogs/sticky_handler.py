@@ -97,10 +97,12 @@ async def setup(bot: commands.Bot) -> None:
 
     STICKY_CHANNELS = await db.get_sticky_list()
     print("\t\tLoaded stickies in channels:")
-    for pair in STICKY_CHANNELS:
-        print(f"\t\t\t{pair[0]}")
+
     if not STICKY_CHANNELS:
         print("\t\t\tNo stickies in database")
+    else:
+        for pair in STICKY_CHANNELS:
+            print(f"\t\t\t{pair[0]}")
 
     sticky_channels = []
     for channel in STICKY_CHANNELS:
