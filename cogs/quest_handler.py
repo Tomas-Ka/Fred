@@ -10,6 +10,22 @@ import webcolors
 import db_handler as db
 from helpers import QuestInfo
 
+# ----------------------GLOBAL VARS-----------------------
+def quest_info_error_message(quest_modal, raw_colour_value) -> str:
+    return f"""
+        Here is your quest info:
+
+        **Title:** {quest_modal.quest_title.value}
+
+        **Contractor:** {quest_modal.contractor.value}
+
+        **Description:** {quest_modal.description.value}
+
+        **Reward:** {quest_modal.reward.value}
+
+        **Colour:** {raw_colour_value}
+        """
+
 # --------------------PERSISTENT VIEWS--------------------
 
 
@@ -121,38 +137,13 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
             embed_colour = webcolors.name_to_hex(raw_colour_value)
         except ValueError:
             # Error handling for misspellt or non-existing colour name.
-            message = f"""Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.
-
-            Here is your quest info:
-
-            **Title:** {self.quest_title.value}
-
-            **Contractor:** {self.contractor.value}
-
-            **Description:** {self.description.value}
-
-            **Reward:** {self.reward.value}
-
-            **Colour:** {raw_colour_value}"""
-
+            message = f'Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.' + quest_info_error_message(self, raw_colour_value)
             await interaction.response.send_message(message, ephemeral=True)
             return
 
         # Make sure we don't have duplicate quest titles:
         if await db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
-            message = f"""The quest name "{self.quest_title.value}" is already in use, please try another name
-
-            Here is your quest info:
-
-            **Title:** {self.quest_title.value}
-
-            **Contractor:** {self.contractor.value}
-
-            **Description:** {self.description.value}
-
-            **Reward:** {self.reward.value}
-
-            **Colour:** {raw_colour_value}"""
+            message = f'The quest name "{self.quest_title.value}" is already in use, please try another name.' + quest_info_error_message(self, raw_colour_value)
 
             await interaction.response.send_message(message, ephemeral=True)
             return
@@ -161,8 +152,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         embed = discord.Embed(
             title=self.quest_title.value,
             description=self.description.value,
-            color=discord.Color.from_str(
-                embed_colour))
+            color=discord.Color.from_str(embed_colour))
 
         embed.set_author(
             name=interaction.user.display_name,
@@ -181,6 +171,7 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
                 value=self.reward.value,
                 inline=True)
 
+        #! Unique Line
         # Create the quest role with the name of the quest title.
         quest_role = await interaction.guild.create_role(name=self.quest_title.value, mentionable=True, reason="New Quest created")
 
@@ -192,9 +183,11 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
         else:
             msg = await interaction.channel.send(content="", embed=embed)
 
+        #! Unique Line
         # Create & attatch the thread to the newly created quest info message.
         thread = await msg.create_thread(name=self.quest_title.value, auto_archive_duration=10080)
 
+        #! Unique Line
         # Send the player amount message in the thread and pin it.
         pin_message: discord.Message = await thread.send(embed=discord.Embed(title="Players:", color=discord.Color.from_str(embed_colour)))
         await pin_message.pin()
@@ -214,24 +207,13 @@ class CreateQuest(discord.ui.Modal, title="Create Quest"):
 
         # Set the quest join button to appear under the joined players list.
         quest_id = (await db.get_quest_by_title(interaction.guild_id, quest.quest_title))[0]
+        #! Unique Line
         await pin_message.edit(view=PersistentQuestJoinView(quest, quest_id))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         try:
-            message = f"""Something went wrong, please try again.
-
-            Here is your quest info:
-
-            **Title:** {self.quest_title.value}
-
-            **Contractor:** {self.contractor.value}
-
-            **Description:** {self.description.value}
-
-            **Reward:** {self.reward.value}
-
-            **Colour:** {self.embed_colour.value}"""
+            message = f'Something went wrong, please try again.' + quest_info_error_message(self, self.embed_colour.value)
 
             await interaction.response.send_message(message, ephemeral=True)
         except ValueError:
@@ -296,39 +278,16 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
             self.embed_colour = webcolors.name_to_hex(raw_colour_value)
         except ValueError:
             # Error handling for misspellt or non-existing colour name.
-            message = f"""Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.
-
-            Here is your quest info:
-
-            **Title:** {self.quest_title.value}
-
-            **Contractor:** {self.contractor.value}
-
-            **Description:** {self.description.value}
-
-            **Reward:** {self.reward.value}
-
-            **Colour:** {raw_colour_value}"""
+            message = f'Colour name "{raw_colour_value}" either non-existent or misspellt, please try again.' + quest_info_error_message(self, raw_colour_value)
 
             await interaction.response.send_message(message, ephemeral=True)
             return
 
         # Make sure we don't have duplicate quest titles.
+        #! Unique
         if not self.quest_title.value == self.old_title:
             if await db.get_quest_by_title(interaction.guild_id, self.quest_title.value):
-                message = f"""The quest name "{self.quest_title.value}" is already in use, please try another name
-
-                Here is your quest info:
-
-                **Title:** {self.quest_title.value}
-
-                **Contractor:** {self.contractor.value}
-
-                **Description:** {self.description.value}
-
-                **Reward:** {self.reward.value}
-
-                **Colour:** {raw_colour_value}"""
+                message = f'The quest name "{self.quest_title.value}" is already in use, please try another name.' + quest_info_error_message(self, raw_colour_value)
 
                 await interaction.response.send_message(message, ephemeral=True)
                 return
@@ -356,6 +315,8 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                 value=self.reward.value,
                 inline=True)
 
+        #? Line Missing
+        
         # Check that the player role exists before we ping it:
         player_role = discord.utils.get(interaction.guild.roles, name="Player")
         if player_role:
@@ -363,6 +324,7 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
         else:
             await self.message.edit(content="", embed=embed)
 
+        #! Unique Line
         # Edit thread and role names.
         thread = self.message.channel.get_thread(thread_id)
         await thread.edit(name=self.quest_title.value)
@@ -377,28 +339,19 @@ class EditQuest(discord.ui.Modal, title="Edit Quest"):
                           thread_id,
                           quest_role_id,
                           self.quest_info.pin_message_id,
-                          self.quest_info.players
-                          )
+                          self.quest_info.players)
+        
         await db.update_quest(self.message.id, quest)
+        
+        # Set the quest join button to appear under the joined players list.
         quest_id = (await db.get_quest_by_title(interaction.guild_id, quest.quest_title))[0]
+        #! Unique Line
         await thread.get_partial_message(self.quest_info.pin_message_id).edit(view=PersistentQuestJoinView(quest, quest_id))
         await interaction.response.defer()
 
     async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
         try:
-            message = f"""Something went wrong, please try again.
-
-            Here is your quest info:
-
-            **Title:** {self.quest_title.value}
-
-            **Contractor:** {self.contractor.value}
-
-            **Description:** {self.description.value}
-
-            **Reward:** {self.reward.value}
-
-            **Colour:** {self.embed_colour.value}"""
+            message = f'Something went wrong, please try again.' + quest_info_error_message(self, self.embed_colour.value)
 
             await interaction.response.send_message(message, ephemeral=True)
         except ValueError:
