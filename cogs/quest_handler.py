@@ -10,8 +10,8 @@ import webcolors
 import db_handler as db
 from helpers import QuestInfo
 
-# ----------------------GLOBAL VARS-----------------------
 
+# ----------------------GLOBAL VARS-----------------------
 
 def quest_info_error_message(quest_modal, raw_colour_value) -> str:
     return f"""
@@ -28,8 +28,8 @@ def quest_info_error_message(quest_modal, raw_colour_value) -> str:
         **Colour:** {raw_colour_value}
         """
 
-# --------------------PERSISTENT VIEWS--------------------
 
+# --------------------PERSISTENT VIEWS--------------------
 
 class PersistentQuestJoinView(discord.ui.View):
     # View for the join quest button.
@@ -99,6 +99,7 @@ class PersistentQuestJoinView(discord.ui.View):
 
 
 # ------------------------MODALS--------------------------
+
 class BaseQuestModal(discord.ui.Modal):
     def __init__(self):
         super().__init__()
@@ -431,8 +432,8 @@ class SetQuestAmount(discord.ui.Modal, title="Set Quests Played"):
         # Make sure we know what the error is.
         traceback.print_tb(error.__traceback__)
 
-# -----------------------MAIN CLASS-----------------------
 
+# -----------------------MAIN CLASS-----------------------
 
 class QuestHandler(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
@@ -577,6 +578,7 @@ class QuestHandler(commands.Cog):
 
 
 # ---------------------OTHER FUNCTIONS--------------------
+
 async def _get_all_quests_played(channel: discord.TextChannel | discord.Thread, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
     May cause fred to hit a rate limit if used too much, handle with care.
@@ -646,10 +648,10 @@ async def _get_all_quests_played(channel: discord.TextChannel | discord.Thread, 
         description=namestring,
         color=discord.Color.from_str(embed_colour))
 
+
 # ----------------------MAIN PROGRAM----------------------
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions().
-
 
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.quest_handler begin loading")
