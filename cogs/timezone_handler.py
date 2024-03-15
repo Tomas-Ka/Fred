@@ -52,7 +52,7 @@ class TimezoneHandler(commands.Cog):
             # TODO Time input string imporperly formatted, error and return.
             return
         
-        if not tz_string.lower() in self.timezones:
+        if not tz_string in self.timezones:
             # TODO Timezone input does not exist, error and return. (Make embed, and ephemeral)
             await interaction.response.send_message(f"{tz_string} is not a valid timezone.")
             return
@@ -68,13 +68,13 @@ class TimezoneHandler(commands.Cog):
         given_tz_obj = datetime.now()
         if not date == None:
             date_results = match("(\d{1,2})[-\/](\d{1,2})[-\/]?(\d{2,4})?", date)
-            day = int(date_results.group(1).lstrip("0"))
-            month = int(date_results.group(2).lstrip("0"))
+            day = int(date_results.group(1))
+            month = int(date_results.group(2))
             year_string = date_results.group(3)
             if year_string:
                 if len(year_string) == 2:
                     year_string = "20" + year_string
-                year = int(year_string.lstrip("0"))
+                year = int(year_string)
             else:
                 year = given_tz_obj.year
             #! TODO; use a try / catch here
