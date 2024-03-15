@@ -4,7 +4,7 @@ import discord
 from re import match
 import db_handler as db
 import pytz
-from datetime import datetime
+from datetime import datetime, time, tzinfo
 from thefuzz import process, fuzz
 
 
@@ -44,7 +44,7 @@ class TimezoneHandler(commands.Cog):
             interaction (discord.Interaction): The discord Interaction object that's passed automatically.
             time_string (str): 24h or 12h time, with or without minutes.
             tz_string (str): The timezone of the given time (to convert to your timezone)
-            date (str): A date in dd/MM, dd/MM/YYYY or dd-MM/YYYY format.
+            date (str): A date in dd/mm/yy, dd/mm-yy or dd-mm-yy with one or two digits for d and m, and two or four digits for y.
         """
         #! TODO; ADD ERROR HANDLING TO THIS ENTIRE FUNCTION
         time_results = match("(\d{1,2}):*(\d{1,2})*(am|pm)*", time_string)
@@ -52,7 +52,7 @@ class TimezoneHandler(commands.Cog):
             # TODO Time input string imporperly formatted, error and return.
             return
         
-        if not tz_string.lower() in [timezone.lower() for timezone in self.timezones]:
+        if not tz_string.lower() in self.timezones:
             # TODO Timezone input does not exist, error and return. (Make embed, and ephemeral)
             await interaction.response.send_message(f"{tz_string} is not a valid timezone.")
             return
@@ -67,7 +67,7 @@ class TimezoneHandler(commands.Cog):
         # Set the correct day
         given_tz_obj = datetime.now()
         if not date == None:
-            date_results = match("(\d{1,2})[-\/](\d{1,2})\/?(\d{2,4})?", date)
+            date_results = match("(\d{1,2})[-\/](\d{1,2})[-\/]?(\d{2,4})?", date)
             day = int(date_results.group(1).lstrip("0"))
             month = int(date_results.group(2).lstrip("0"))
             year_string = date_results.group(3)
