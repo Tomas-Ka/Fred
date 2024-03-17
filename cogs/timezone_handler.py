@@ -4,7 +4,7 @@ import discord
 from re import match
 import db_handler as db
 import pytz
-from datetime import datetime, time, tzinfo
+from datetime import datetime
 from thefuzz import process, fuzz
 
 
@@ -37,21 +37,43 @@ class TimezoneHandler(commands.Cog):
     @app_commands.autocomplete(tz_string=tz_string_autocomplete)
     @app_commands.rename(time_string="time")
     @app_commands.rename(tz_string="timezone")
-    async def time(self, interaction: discord.Interaction, time_string: str, tz_string: str, date: str = None) -> None:
-        """Returns the given time in your own timezone 
+    async def time(self, interaction: discord.Interaction, time_string: str, date: str = None, tz_string: str = None) -> None:
+        
+        """Makes a discord timestamp of the given time
 
         Args:
             interaction (discord.Interaction): The discord Interaction object that's passed automatically.
             time_string (str): 24h or 12h time, with or without minutes.
-            tz_string (str): The timezone of the given time (to convert to your timezone)
             date (str): A date in dd/mm/yy, dd/mm-yy or dd-mm-yy with one or two digits for d and m, and two or four digits for y.
+            tz_string (str): The timezone of the given time (to use instead of your timezone)
         """
-        #! TODO; ADD ERROR HANDLING TO THIS ENTIRE FUNCTION
         time_results = match("(\d{1,2}):*(\d{1,2})*(am|pm)*", time_string)
-        if time_results == None:
-            # TODO Time input string imporperly formatted, error and return.
+        if time_results == None or time_results.group(1) == None:
+            # TODO Time input string improperly formatted, error and return.
             return
         
+        hour = int(time_results.group(1))
+
+        # Deal with am / pm bullshit:
+        # 12h time format is scuffed asf, 12am is midnight, 12pm is midday.
+        # This fixes that by removing 12h if we are at midnight or midday.
+        if time_results.group(3) == "am" and hour == 12:
+            hour = 0
+        if time_results.group(3) == "pm" and not hour == 12:
+            hour += 12
+        hour = hour % 24
+
+        if time_results.group(2):
+            minute = int(time_results.group(2))
+        else:
+            # If there is no minute we assume the user means an even hour.
+            minute = 0
+        minute = minute % 60
+
+
+        if tz_string == None:
+            tz_string = db.get_tz(interaction.user.id)
+
         if not tz_string in self.timezones:
             # TODO Timezone input does not exist, error and return. (Make embed, and ephemeral)
             await interaction.response.send_message(f"{tz_string} is not a valid timezone.")
@@ -62,12 +84,12 @@ class TimezoneHandler(commands.Cog):
         if tz_string.lower() == "st":
             tz_string = "UTC"
 
-
-        # TODO This needs error correcting
-        # Set the correct day
-        given_tz_obj = datetime.now()
+        tz_object = datetime.now(tz=pytz.timezone(tz_string))
         if not date == None:
             date_results = match("(\d{1,2})[-\/](\d{1,2})[-\/]?(\d{2,4})?", date)
+            if date_results == None:
+                # TODO Error, date format invalid
+                return
             day = int(date_results.group(1))
             month = int(date_results.group(2))
             year_string = date_results.group(3)
@@ -76,44 +98,25 @@ class TimezoneHandler(commands.Cog):
                     year_string = "20" + year_string
                 year = int(year_string)
             else:
-                year = given_tz_obj.year
-            #! TODO; use a try / catch here
-            given_tz_obj = datetime(year, month, day, tzinfo=pytz.timezone(tz_string))
+                year = tz_object.year
+            try:
+                tz_object = datetime(year, month, day, tzinfo=pytz.timezone(tz_string))
+                print(tz_object.minute)
+            except ValueError:
+                # TODO Error, day or month is too large
+                return
 
-        # Set target hour
-        if time_results.group(1) == None:
-            # TODO Input is missing an hour, error and return.
-            return
-        hour = int(time_results.group(1))
-
-        # Set target minute.
-        if time_results.group(2):
-            minute = int(time_results.group(2))
-        else:
-            # If there is no minute we assume the user means an even hour.
-            minute = 0
-
-        # Deal with am / pm bullshit:
-        # 12h time format is scuffed asf, 12am is midnight, 12pm is midday.
-        # This fixes that by removing 12h if we are at midnight or midday.
-        if time_results.group(3) == "am" and hour == 12:
-            hour = 0
-        if time_results.group(3) == "pm" and not hour == 12:
-            hour += 12
+        tz_object = tz_object.replace(hour = hour, minute = minute)
+        print(tz_object.minute)
+        new_time = tz_object.astimezone(pytz.timezone("UTC"))
+        print(new_time.minute)
+        utc_timestamp = int(tz_object.astimezone(pytz.timezone("UTC")).timestamp())
+        print(utc_timestamp)
+        #! There is some strange error here which increases our minutes by 7 when a date is given... Will have to check properly
         
-        #! TODO, check so hour and minute is within 24 and 60 spans.
-
-        # Replaces the time on the current date with the given one
-        given_tz_obj = given_tz_obj.replace(hour = hour, minute = minute)
-
-        # Convert timezones and output to user
-        user_tz = db.get_tz(interaction.user.id)
-        target_tz_obj = given_tz_obj.astimezone(pytz.timezone(user_tz))
-
-        await interaction.response.send_message(f"**{target_tz_obj.strftime('%H:%M')}** local time\n({time_string} in {tz_string} timezone)")
-        #! TODO; MAKE EMBED (original time & timezone be footer?)
-        #! TODO; check if it's +1 day
-        #! TODO; ALSO ADD DISCORD TIMESTAMP
+        embed=discord.Embed(title=f"<t:{utc_timestamp}:t>")
+        embed.set_footer(text=f"original time: {time_string} in {tz_string} timezone")
+        await interaction.response.send_message(embed=embed)
 
 
 
@@ -128,7 +131,8 @@ class TimezoneHandler(commands.Cog):
             tz_string (str): An Olson database formatted timezone name.
         """
         if not tz_string in self.timezones:
-            await interaction.response.send_message(f"{tz_string} is not a valid timezone.")
+            embed=discord.Embed(title="Timezone update failed", description=f"{tz_string} is not a valid timezone.")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         # Here we hack in "servertime" for FFXIV, because I'm totally not addicted and this entire
@@ -137,8 +141,8 @@ class TimezoneHandler(commands.Cog):
             tz_string = "UTC"
         
         db.set_tz(interaction.user.id, tz_string)
-        await interaction.response.send_message(f"Set {interaction.user.display_name}'s timezone to {tz_string}")
-        #! TODO; MAKE EMBED
+        embed=discord.Embed(title="Timezone update", description=f"Set your timezone to {tz_string}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     
     @tzgroup.command()
     async def get(self, interaction:discord.Interaction):
@@ -146,9 +150,9 @@ class TimezoneHandler(commands.Cog):
 
         Args:
             interaction (discord.Interaction): The discord Interaction object that's passed automatically.
-        """        
-        await interaction.response.send_message(f"Your set timezone is {db.get_tz(interaction.user.id)}")
-        #! TODO; MAKE EMBED (and also ephemeral)
+        """
+        embed=discord.Embed(title="Timezone", description=f"Your set timezone is {db.get_tz(interaction.user.id)}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     
 async def setup(bot: commands.Bot) -> None:
     print(f"\tcogs.timezone_handler begin loading")
