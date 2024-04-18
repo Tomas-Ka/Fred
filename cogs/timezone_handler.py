@@ -26,12 +26,14 @@ class TimezoneHandler(commands.Cog):
         Returns:
             list[app_commands.Choice[str]]: A list of autocompletes in the form of application command choices.
         """
+        return_val = []
         if current == '':
             return []
-        fuzzy_matches = [tz for tz in process.extract(current, self.timezones, scorer=fuzz.ratio, limit=25) if tz[1] >= 50]
-        return [app_commands.Choice(name=tz[0], value=tz[0]) for tz in fuzzy_matches]
-
-        #! TODO; Split the fuzzy search up on the "/" Characters so we can search for just a city name as well
+        if current in timezones:
+                return_val.append(current)
+        
+        fuzzy_matches = [tz for tz in process.extract(current, self.timezones, scorer=fuzz.partial_ratio, limit=24) if tz[1] >= 50]
+        return return_val + [app_commands.Choice(name=tz[0], value=tz[0]) for tz in fuzzy_matches]
 
     @app_commands.command(description="Displays the given time in your own timezone")
     @app_commands.autocomplete(tz_string=tz_string_autocomplete)
@@ -47,13 +49,12 @@ class TimezoneHandler(commands.Cog):
             date (str): A date in dd/mm/yy, dd/mm-yy or dd-mm-yy with one or two digits for d and m, and two or four digits for y.
             tz_string (str): The timezone of the given time (to use instead of your timezone)
         """
-        time_results = match("(\d{1,2}):*(\d{1,2})*(am|pm)*", time_string)
+        time_results = match("(\\d{1,2}):*(\\d{1,2})*(am|pm)*", time_string)
         if time_results == None or time_results.group(1) == None:
             # TODO Time input string improperly formatted, error and return.
             return
-        
-        hour = int(time_results.group(1))
 
+        hour = int(time_results.group(1))
         # Deal with am / pm bullshit:
         # 12h time format is scuffed asf, 12am is midnight, 12pm is midday.
         # This fixes that by removing 12h if we are at midnight or midday.
@@ -86,7 +87,7 @@ class TimezoneHandler(commands.Cog):
 
         tz_object = datetime.now(tz=pytz.timezone(tz_string))
         if not date == None:
-            date_results = match("(\d{1,2})[-\/](\d{1,2})[-\/]?(\d{2,4})?", date)
+            date_results = match("(\\d{1,2})[-\\/](\\d{1,2})[-\\/]?(\\d{2,4})?", date)
             if date_results == None:
                 # TODO Error, date format invalid
                 return
@@ -107,11 +108,11 @@ class TimezoneHandler(commands.Cog):
                 return
 
         tz_object = tz_object.replace(hour = hour, minute = minute)
-        print(tz_object.minute)
+        print(f"{tz_object=}")
         new_time = tz_object.astimezone(pytz.timezone("UTC"))
-        print(new_time.minute)
+        print(f"{new_time=}")
         utc_timestamp = int(tz_object.astimezone(pytz.timezone("UTC")).timestamp())
-        print(utc_timestamp)
+        print(f"{utc_timestamp=}")
         #! There is some strange error here which increases our minutes by 7 when a date is given... Will have to check properly
         
         embed=discord.Embed(title=f"<t:{utc_timestamp}:t>")
