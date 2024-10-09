@@ -482,6 +482,13 @@ async def create_receipt(public_message_id: int, board_message_id: int) -> None:
     """
     await _execute_query(receipt_update, (public_message_id, board_message_id,))
 
+async def get_receipt_list() -> list[tuple[int, int]]:
+    """Returns a list of all receipts in the database
+    Returns:
+        list[tuple[int, int]]: a list of all receipt tuples in the database
+    """
+    receipts_get = """SELECT * FROM receipts"""
+    return await _execute_multiple_read_query(receipts_get)
 
 async def del_receipt_public(public_message_id: int) -> None:
     """Remove a receipt from the db given the public id

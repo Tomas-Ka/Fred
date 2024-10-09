@@ -24,7 +24,6 @@ class ReceiptDenyModal(discord.ui.Modal):
         await interaction.response.send_message(f"rejected receipt, reasoning: {self.reason.value}")
 
 
-
 class PublicMessageView(discord.ui.View):
     def __init__(self, message_id: int, disabled: bool = False) -> None:
 
@@ -64,6 +63,7 @@ class PublicMessageView(discord.ui.View):
             ReceiptDenyModal(int(embed.author.url[8:-12]),
                              embed.fields[0].name)
         )
+
 
 class ReceiptsHandler(commands.Cog):
     bot: commands.Bot
@@ -106,4 +106,15 @@ class ReceiptsHandler(commands.Cog):
 # and is run when the cog is loaded with bot.load_extensions().
 async def setup(bot: commands.Bot) -> None:
     print("\tcogs.receipts_handler begin loading")
+
+    receipts = await db.get_receipt_list()
+
+    print("\t\tloading following receipts")
+    if receipts:
+        for receipt in receipts:
+            print(f"\t\t\t{receipt[1]}")
+            bot.add_view(PublicMessageView(receipt[0]))
+    else:
+        print("\t\t\tNo receipts in database")
+
     await bot.add_cog(ReceiptsHandler(bot))
