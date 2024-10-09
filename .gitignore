@@ -12,4 +12,4 @@ lib/
 pyvenv.cfg
 share/
 db.sqlite
-
+pyrightconfig.json

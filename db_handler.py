@@ -45,6 +45,14 @@ async def _create_tables() -> None:
     """
     await _execute_query(create_players_table)
 
+    create_receipts_table = """
+    CREATE TABLE IF NOT EXISTS receipts (
+        "public_message_id" INTEGER NOT NULL,
+        "board_message_id" INTEGER NOT NULL
+    );
+    """
+    await _execute_query(create_receipts_table)
+
     print("all done, closing out!")
 
 
@@ -457,6 +465,42 @@ async def update_player(guild_id: int, player_id: int, quests_completed: int) ->
             guild_id = ?
     """
     await _execute_query(player_update, (quests_completed, player_id, guild_id))
+
+
+async def add_receipt(public_message_id: int, board_message_id: int) -> None:
+    """Adds a receipt message to the database
+
+    Args:
+        public_message_id (int): The id of the discord channel the receipt was sent in.
+        board_message_id (int): The id of the discord channel the receipts is copied to.
+    """
+    receipt_update = """
+        INSERT INTO
+            receipts (public_message_id, board_message_id)
+        VALUES
+            (?, ?);
+    """
+    await _execute_query(receipt_update, (public_message_id, board_message_id,))
+
+
+async def del_receipt_public(public_message_id: int) -> None:
+    """Remove a receipt from the db given the public id
+
+    Args:
+        public_message_id (int): The Id of the message to remove
+    """
+    receipt_del = "DELETE FROM receipts WHERE public_message_id = ?"
+    await _execute_query(receipt_del, (public_message_id,))
+
+
+async def del_receipt_board(board_message_id: int) -> None:
+    """Remove a receipt from the db given the board message id
+
+    Args:
+        board_message_id (int): The Id of the message to remove
+    """
+    receipt_del = "DELETE FROM receipts WHERE board_message_id = ?"
+    await _execute_query(receipt_del, (board_message_id,))
 
 
 if __name__ == "__main__":

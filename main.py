@@ -7,11 +7,11 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 load_dotenv()
-token = environ["TOKEN"]
+token = environ["TEST_TOKEN"]
 
 # -----------------------STATIC VARS----------------------
 # test guild, discord bot testing grounds
-# TEST_GUILD = discord.Object(put ID of guild here)
+TEST_GUILD = discord.Object(environ["TEST_SERVER"])
 
 
 # -----------------------MAIN CLASS-----------------------
@@ -43,7 +43,8 @@ class FredBot(commands.Bot):
             'cogs.quest_handler',
             'cogs.sticky_handler',
             'cogs.archive_handler',
-            'cogs.whale_handler'
+            'cogs.whale_handler',
+            'cogs.receipts_handler'
         ]
 
         for extension in extensions:
@@ -58,7 +59,6 @@ class FredBot(commands.Bot):
         # await self.tree.sync()
         # self.tree.copy_global_to(guild=TEST_GUILD)
         # await self.tree.sync(guild=TEST_GUILD)
-
 
 # ------------------------MAIN CODE-----------------------
 bot = FredBot(command_prefix="!")
