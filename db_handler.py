@@ -348,11 +348,11 @@ async def get_sticky(channel_id: int) -> int:
     return (await _execute_read_query(sticky_query, (channel_id,)))[1]
 
 
-async def get_sticky_list() -> list[int]:
+async def get_sticky_list() -> list[tuple]:
     """Returns a list of all stickies in the database.
 
     Returns:
-        list[int]: A list of ids for the channels the stickies are in.
+        list[tuple]: A list of tuples on the form (channel_id, message_id)
     """
     sticky_query = """
     SELECT * FROM stickies"""

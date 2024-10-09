@@ -93,7 +93,7 @@ class StickyHandler(commands.Cog):
 # This setup is required for the cog to setup and run,
 # and is run when the cog is loaded with bot.load_extensions().
 async def setup(bot: commands.Bot) -> None:
-    print(f"\tcogs.sticky_handler begin loading")
+    print("\tcogs.sticky_handler begin loading")
 
     STICKY_CHANNELS = await db.get_sticky_list()
     print("\t\tLoaded stickies in channels:")
