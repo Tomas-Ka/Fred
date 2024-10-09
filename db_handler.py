@@ -467,7 +467,7 @@ async def update_player(guild_id: int, player_id: int, quests_completed: int) ->
     await _execute_query(player_update, (quests_completed, player_id, guild_id))
 
 
-async def add_receipt(public_message_id: int, board_message_id: int) -> None:
+async def create_receipt(public_message_id: int, board_message_id: int) -> None:
     """Adds a receipt message to the database
 
     Args:
