@@ -19,14 +19,14 @@ class ReceiptDenyModal(discord.ui.Modal):
     )
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer()
         user = interaction.guild.get_member(self.user_id)
-        await user.send(f'Your receipt "{self.receipt_name}" has been checked and for some reason needs amending.\nThe reason is: {self.reason.value}')
-        print(self.reason.value)
+        await user.send(f'Your receipt "{self.receipt_name}" has been checked and needs amending. The reason is: {self.reason.value}')
+        await interaction.response.send_message(f"rejected receipt, reasoning: {self.reason.value}")
+
 
 
 class PublicMessageView(discord.ui.View):
-    def __init__(self, message_id: int) -> None:
+    def __init__(self, message_id: int, disabled: bool = False) -> None:
 
         self.message_id = message_id
         # Create the button here since I need access to self.info for the
@@ -34,13 +34,15 @@ class PublicMessageView(discord.ui.View):
         self.accept_button = discord.ui.button(
             label="Accept",
             style=discord.ButtonStyle.green,
-            custom_id=str(f"{message_id}:accept"))(
+            custom_id=str(f"{message_id}:accept"),
+            disabled=disabled)(
             PublicMessageView.accept_receipt)
 
         self.deny_button = discord.ui.button(
             label="Deny",
             style=discord.ButtonStyle.gray,
-            custom_id=str(f"{message_id}:deny"))(
+            custom_id=str(f"{message_id}:deny"),
+            disabled=disabled)(
             PublicMessageView.deny_receipt)
 
         # Not sure what this does tbh, but I'm scared to remove it...
@@ -50,15 +52,18 @@ class PublicMessageView(discord.ui.View):
         super().__init__(timeout=None)
 
     async def accept_receipt(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await db.del_receipt_board(interaction.message.id)
+        await interaction.message.edit(view=PublicMessageView(self.message_id, True))
         await interaction.response.send_message("accepted receipt!")
 
     async def deny_receipt(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         embed = interaction.message.embeds[0]
+        await db.del_receipt_board(interaction.message.id)
+        await interaction.message.edit(view=PublicMessageView(self.message_id, True))
         await interaction.response.send_modal(
             ReceiptDenyModal(int(embed.author.url[8:-12]),
                              embed.fields[0].name)
         )
-
 
 class ReceiptsHandler(commands.Cog):
     bot: commands.Bot
@@ -83,10 +88,8 @@ class ReceiptsHandler(commands.Cog):
         embed.set_author(name=interaction.user.name,
                          icon_url=interaction.user.display_avatar.url,
                          url=f"https://{interaction.user.id}.nonexistant")
-        embed.add_field(name="",
-                        value=f"""name: {name}
-                        total: {total}
-                        number: {phone_number}""")
+        embed.add_field(name=name,
+                        value=f"""total: {total} number: {phone_number}""")
         embed.set_image(url=receipt_image.url)
 
         await interaction.response.defer(thinking=False)
@@ -94,7 +97,7 @@ class ReceiptsHandler(commands.Cog):
         public_msg = await interaction.followup.send(embed=embed)
 
         board_msg = await self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID)
-                                               ).send(embed=embed, view=PublicMessageView(public_msg.id))
+                                                ).send(embed=embed, view=PublicMessageView(public_msg.id))
         await db.create_receipt(public_msg.id, board_msg.id)
 
 
