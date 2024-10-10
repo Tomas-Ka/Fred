@@ -1,11 +1,16 @@
+import asyncio
+from requests import session
+from bs4 import BeautifulSoup  # for testing should be removed !TODO
+from os import environ
 import discord
 from discord.ext import commands
 from discord import app_commands
-from os import environ
 import db_handler as db
 
 BOARD_RECEIPTS_CHANNEL_ID = environ["BOARD_RECEIPTS_CHANNEL"]
-
+EMAIL = environ["RECEIPT_EMAIL"]
+PASSWORD = environ["RECEIPT_PASSWORD"]
+WEBSITE = environ["RECEIPT_WEBSITE"]
 
 class ReceiptDenyModal(discord.ui.Modal):
     def __init__(self, user_id: int, receipt_name: str) -> None:
@@ -52,8 +57,13 @@ class PublicMessageView(discord.ui.View):
 
     async def accept_receipt(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await db.del_receipt_board(interaction.message.id)
+        await interaction.response.defer()
+        # - TODO; fix actual web scraping / pushing here!
+        await send_receipt({"email": EMAIL, "password": PASSWORD, "website": WEBSITE },
+                           interaction.channel)
+        # Defer this function since it'll take a while, and then send a message depending on response
         await interaction.message.edit(view=PublicMessageView(self.message_id, True))
-        await interaction.response.send_message("accepted receipt!")
+        await interaction.followup.send("accepted receipt!")
 
     async def deny_receipt(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         embed = interaction.message.embeds[0]
@@ -99,6 +109,27 @@ class ReceiptsHandler(commands.Cog):
         board_msg = await self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID)
                                                 ).send(embed=embed, view=PublicMessageView(public_msg.id))
         await db.create_receipt(public_msg.id, board_msg.id)
+
+
+def send_receipt_sync(login: dict) -> tuple:
+    with session() as c:
+        payload = {
+            'data[User][captchaToken]': "",
+            'data[User][username]': login['email'],
+            'data[User][password]': login['password']
+        }
+
+        c.post(login['website'] + "/users/login", data=payload)
+        response = c.get(login['website'] + "/users/home")
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        return (response.status_code, soup.title.string)
+
+
+async def send_receipt(login: dict, channel) -> None:
+    c = asyncio.to_thread(send_receipt_sync, login)
+    result = await c
+    await channel.send(f"response {result[0]}, loaded website {result[1]}")
 
 
 # ----------------------MAIN PROGRAM----------------------
