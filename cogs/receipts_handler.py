@@ -1,6 +1,6 @@
 import asyncio
 from requests import session
-from bs4 import BeautifulSoup  # for testing should be removed !TODO
+from bs4 import BeautifulSoup  # !TODO: for testing should be removed
 from os import environ
 import discord
 from discord.ext import commands
@@ -11,6 +11,7 @@ BOARD_RECEIPTS_CHANNEL_ID = environ["BOARD_RECEIPTS_CHANNEL"]
 EMAIL = environ["RECEIPT_EMAIL"]
 PASSWORD = environ["RECEIPT_PASSWORD"]
 WEBSITE = environ["RECEIPT_WEBSITE"]
+
 
 class ReceiptDenyModal(discord.ui.Modal):
     def __init__(self, user_id: int, receipt_name: str) -> None:
@@ -59,7 +60,7 @@ class PublicMessageView(discord.ui.View):
         await db.del_receipt_board(interaction.message.id)
         await interaction.response.defer()
         # - TODO; fix actual web scraping / pushing here!
-        await send_receipt({"email": EMAIL, "password": PASSWORD, "website": WEBSITE },
+        await send_receipt({"email": EMAIL, "password": PASSWORD, "website": WEBSITE},
                            interaction.channel)
         # Defer this function since it'll take a while, and then send a message depending on response
         await interaction.message.edit(view=PublicMessageView(self.message_id, True))
