@@ -16,12 +16,15 @@ class ReceiptDenyModal(discord.ui.Modal):
         receipt_name: str,
         interaction: discord.Interaction,
         message_id: int,
+        message_jump: str,
     ) -> None:
+
         super().__init__(title="Deny Receipt")
         self.user_id = user_id
         self.receipt_name = receipt_name
         self.receipt_interaction = interaction
         self.message_id = message_id
+        self.message_jump = message_jump
 
     reason = discord.ui.TextInput(
         label="Reason for denying Receipt", placeholder="type text here..."
@@ -35,6 +38,7 @@ class ReceiptDenyModal(discord.ui.Modal):
             return
         await user.send(
             f'Your receipt "{self.receipt_name}" has been checked and needs amending. The reason is: {self.reason.value}'
+            + f"\nyou can find your receipt here: {self.message_jump}"
         )
         await interaction.response.send_message(
             f"{interaction.user} rejected receipt, reasoning: {self.reason.value}"
@@ -43,14 +47,17 @@ class ReceiptDenyModal(discord.ui.Modal):
             return
         await db.del_receipt_board(self.receipt_interaction.message.id)
         await self.receipt_interaction.message.edit(
-            view=PublicMessageView(self.message_id, True)
+            view=PublicMessageView(self.message_id, self.message_jump, True)
         )
 
 
 class PublicMessageView(discord.ui.View):
-    def __init__(self, message_id: int, disabled: bool = False) -> None:
+    def __init__(
+        self, message_id: int, message_jump: str, disabled: bool = False
+    ) -> None:
 
         self.message_id = message_id
+        self.message_jump = message_jump
         # Create the button here since I need access to self.info for the
         # custom_id.
         self.accept_button = discord.ui.button(
@@ -83,7 +90,7 @@ class PublicMessageView(discord.ui.View):
         _embed = interaction.message.embeds[0]
         if _embed.image.url is not None:
             await interaction.message.edit(
-                view=PublicMessageView(self.message_id, True)
+                view=PublicMessageView(self.message_id, self.message_jump, True)
             )
             await db.del_receipt_board(interaction.message.id)
 
@@ -105,6 +112,7 @@ class PublicMessageView(discord.ui.View):
                 embed.fields[0].name,
                 interaction,
                 self.message_id,
+                self.message_jump,
             )
         )
 
@@ -141,10 +149,10 @@ class ReceiptsHandler(commands.Cog):
 
         await interaction.response.defer(thinking=False)
 
-        public_msg = await interaction.followup.send(embed=embed)
+        public_msg: discord.Message = await interaction.followup.send(embed=embed)
 
         board_msg = await self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID)).send(
-            embed=embed, view=PublicMessageView(public_msg.id)
+            embed=embed, view=PublicMessageView(public_msg.id, public_msg.jump_url)
         )
         await db.create_receipt(public_msg.id, board_msg.id)
 
