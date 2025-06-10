@@ -1,18 +1,12 @@
-import asyncio
-import re
 from os import environ
 
 import discord
-import requests
 from discord import app_commands
 from discord.ext import commands
 
 import db_handler as db
 
 BOARD_RECEIPTS_CHANNEL_ID = environ["BOARD_RECEIPTS_CHANNEL"]
-EMAIL = environ["RECEIPT_EMAIL"]
-PASSWORD = environ["RECEIPT_PASSWORD"]
-WEBSITE = environ["RECEIPT_WEBSITE"]
 
 
 class ReceiptDenyModal(discord.ui.Modal):
@@ -88,21 +82,6 @@ class PublicMessageView(discord.ui.View):
             return
         _embed = interaction.message.embeds[0]
         if _embed.image.url is not None:
-            if _embed.image.url[:-3] == ".png":  # TODO: This is super sketchy.
-                raise TypeError  # TODO: Make sure to handle filetypes a lot better in the future
-            image = requests.get(_embed.image.url, stream=True).raw.data
-
-            embed_field = interaction.message.embeds[0].fields[0]
-            await send_receipt(
-                {"email": EMAIL, "password": PASSWORD, "website": WEBSITE},
-                {
-                    "image": image,
-                    "title": embed_field.name,
-                    "amount": embed_field.value.split()[1],
-                },
-                interaction.channel,
-            )
-            # Defer this function since it'll take a while, and then send a message depending on response
             await interaction.message.edit(
                 view=PublicMessageView(self.message_id, True)
             )
@@ -168,43 +147,6 @@ class ReceiptsHandler(commands.Cog):
             embed=embed, view=PublicMessageView(public_msg.id)
         )
         await db.create_receipt(public_msg.id, board_msg.id)
-
-
-def send_receipt_sync(login: dict, data: dict) -> int:
-    with requests.session() as c:
-        payload = {
-            "_method:": "POST",
-            "data[User][username]": login["email"],
-            "data[User][password]": login["password"],
-            "data[User][captchaToken]": "",
-        }
-        response = c.post(login["website"] + "/users/login", data=payload)
-
-        filename = re.sub(r"[^\w_.)( -]", "", data["title"]) + ".jpg"
-        files = {
-            "_method": (None, "POST"),
-            "data[CustomProject][title]": (None, data["title"]),
-            "data[CustomDocument][custom_grant_type_id]": (None, 1),
-            "data[CustomDocument][amount]": (None, data["amount"]),
-            "data[CustomDocument][status_id]": (None, 1),
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0",
-            "Referer": login["website"] + "/custom_grants",
-            "Origin": login["website"],
-            "Cookie": "CAKEPHP=" + c.cookies.get("CAKEPHP") + "; kt_aside_menu=0",
-        }
-        response = c.request(
-            "POST", login["website"] + "/CustomGrants", files=files, headers=headers
-        )
-        print(response.status_code)
-        return response.status_code
-
-
-async def send_receipt(login: dict, data: dict, channel) -> None:
-    c = asyncio.to_thread(send_receipt_sync, login, data)
-    result = await c
-    await channel.send(f"response {result}")
 
 
 # ----------------------MAIN PROGRAM----------------------
