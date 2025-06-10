@@ -578,8 +578,7 @@ class QuestHandler(commands.Cog):
 
 
 # ---------------------OTHER FUNCTIONS--------------------
-
-async def _get_all_quests_played(channel: discord.TextChannel | discord.Thread, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
+async def _get_all_quests_played(channel, quest_info: QuestInfo = None, increment: bool = False) -> discord.Embed:
     """Returns an Embed containing all players in a channel, along with how many quests they've played.
     May cause fred to hit a rate limit if used too much, handle with care.
 
