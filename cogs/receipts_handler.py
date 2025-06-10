@@ -1,10 +1,12 @@
 import asyncio
-from requests import session
-from bs4 import BeautifulSoup  # !TODO: for testing should be removed
+import re
 from os import environ
+
 import discord
-from discord.ext import commands
+import requests
 from discord import app_commands
+from discord.ext import commands
+
 import db_handler as db
 
 BOARD_RECEIPTS_CHANNEL_ID = environ["BOARD_RECEIPTS_CHANNEL"]
@@ -14,20 +16,41 @@ WEBSITE = environ["RECEIPT_WEBSITE"]
 
 
 class ReceiptDenyModal(discord.ui.Modal):
-    def __init__(self, user_id: int, receipt_name: str) -> None:
+    def __init__(
+        self,
+        user_id: int,
+        receipt_name: str,
+        interaction: discord.Interaction,
+        message_id: int,
+    ) -> None:
         super().__init__(title="Deny Receipt")
         self.user_id = user_id
         self.receipt_name = receipt_name
+        self.receipt_interaction = interaction
+        self.message_id = message_id
 
     reason = discord.ui.TextInput(
-        label="Reason for denying Receipt",
-        placeholder="type text here..."
+        label="Reason for denying Receipt", placeholder="type text here..."
     )
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        if not interaction.guild:
+            return
         user = interaction.guild.get_member(self.user_id)
-        await user.send(f'Your receipt "{self.receipt_name}" has been checked and needs amending. The reason is: {self.reason.value}')
-        await interaction.response.send_message(f"rejected receipt, reasoning: {self.reason.value}")
+        if not user:
+            return
+        await user.send(
+            f'Your receipt "{self.receipt_name}" has been checked and needs amending. The reason is: {self.reason.value}'
+        )
+        await interaction.response.send_message(
+            f"{interaction.user} rejected receipt, reasoning: {self.reason.value}"
+        )
+        if not self.receipt_interaction.message:
+            return
+        await db.del_receipt_board(self.receipt_interaction.message.id)
+        await self.receipt_interaction.message.edit(
+            view=PublicMessageView(self.message_id, True)
+        )
 
 
 class PublicMessageView(discord.ui.View):
@@ -40,15 +63,15 @@ class PublicMessageView(discord.ui.View):
             label="Accept",
             style=discord.ButtonStyle.green,
             custom_id=str(f"{message_id}:accept"),
-            disabled=disabled)(
-            PublicMessageView.accept_receipt)
+            disabled=disabled,
+        )(PublicMessageView.accept_receipt)
 
         self.deny_button = discord.ui.button(
             label="Deny",
             style=discord.ButtonStyle.gray,
             custom_id=str(f"{message_id}:deny"),
-            disabled=disabled)(
-            PublicMessageView.deny_receipt)
+            disabled=disabled,
+        )(PublicMessageView.deny_receipt)
 
         # Not sure what this does tbh, but I'm scared to remove it...
         super().__init_subclass__()
@@ -56,23 +79,54 @@ class PublicMessageView(discord.ui.View):
         # Set timeout to zero which is needed for a persistent view.
         super().__init__(timeout=None)
 
-    async def accept_receipt(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await db.del_receipt_board(interaction.message.id)
+    async def accept_receipt(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
         await interaction.response.defer()
-        # - TODO; fix actual web scraping / pushing here!
-        await send_receipt({"email": EMAIL, "password": PASSWORD, "website": WEBSITE},
-                           interaction.channel)
-        # Defer this function since it'll take a while, and then send a message depending on response
-        await interaction.message.edit(view=PublicMessageView(self.message_id, True))
-        await interaction.followup.send("accepted receipt!")
+        # - TODO: fix actual web scraping / pushing here!
+        if not interaction.message:
+            return
+        _embed = interaction.message.embeds[0]
+        if _embed.image.url is not None:
+            if _embed.image.url[:-3] == ".png":  # TODO: This is super sketchy.
+                raise TypeError  # TODO: Make sure to handle filetypes a lot better in the future
+            image = requests.get(_embed.image.url, stream=True).raw.data
 
-    async def deny_receipt(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+            embed_field = interaction.message.embeds[0].fields[0]
+            await send_receipt(
+                {"email": EMAIL, "password": PASSWORD, "website": WEBSITE},
+                {
+                    "image": image,
+                    "title": embed_field.name,
+                    "amount": embed_field.value.split()[1],
+                },
+                interaction.channel,
+            )
+            # Defer this function since it'll take a while, and then send a message depending on response
+            await interaction.message.edit(
+                view=PublicMessageView(self.message_id, True)
+            )
+            await db.del_receipt_board(interaction.message.id)
+
+            await interaction.followup.send(f"{interaction.user} accepted receipt!")
+        else:
+            await interaction.followup.send(
+                "Error, cannot find the image in that message!"
+            )
+
+    async def deny_receipt(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
         embed = interaction.message.embeds[0]
-        await db.del_receipt_board(interaction.message.id)
-        await interaction.message.edit(view=PublicMessageView(self.message_id, True))
+        # await db.del_receipt_board(interaction.message.id)
+        # await interaction.message.edit(view=PublicMessageView(self.message_id, True))
         await interaction.response.send_modal(
-            ReceiptDenyModal(int(embed.author.url[8:-12]),
-                             embed.fields[0].name)
+            ReceiptDenyModal(
+                int(embed.author.url[8:-12]),
+                embed.fields[0].name,
+                interaction,
+                self.message_id,
+            )
         )
 
 
@@ -85,52 +139,72 @@ class ReceiptsHandler(commands.Cog):
 
     @app_commands.guild_only()
     @app_commands.command(description="Upload a receipt")
-    async def upload_receipt(self,
-                             interaction: discord.Interaction,
-                             receipt_image: discord.Attachment,
-                             name: str,
-                             total: int,
-                             phone_number: int):
+    async def upload_receipt(
+        self,
+        interaction: discord.Interaction,
+        receipt_image: discord.Attachment,
+        name: str,
+        total: int,
+        phone_number: int,
+    ):
         """
         Command to upload receipts
         """
         embed = discord.Embed()
         embed.title = "Receipt"
-        embed.set_author(name=interaction.user.name,
-                         icon_url=interaction.user.display_avatar.url,
-                         url=f"https://{interaction.user.id}.nonexistant")
-        embed.add_field(name=name,
-                        value=f"""total: {total} number: {phone_number}""")
+        embed.set_author(
+            name=interaction.user.name,
+            icon_url=interaction.user.display_avatar.url,
+            url=f"https://{interaction.user.id}.nonexistant",
+        )
+        embed.add_field(name=name, value=f"""total: {total} number: {phone_number}""")
         embed.set_image(url=receipt_image.url)
 
         await interaction.response.defer(thinking=False)
 
         public_msg = await interaction.followup.send(embed=embed)
 
-        board_msg = await self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID)
-                                                ).send(embed=embed, view=PublicMessageView(public_msg.id))
+        board_msg = await self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID)).send(
+            embed=embed, view=PublicMessageView(public_msg.id)
+        )
         await db.create_receipt(public_msg.id, board_msg.id)
 
 
-def send_receipt_sync(login: dict) -> tuple:
-    with session() as c:
+def send_receipt_sync(login: dict, data: dict) -> int:
+    with requests.session() as c:
         payload = {
-            'data[User][captchaToken]': "",
-            'data[User][username]': login['email'],
-            'data[User][password]': login['password']
+            "_method:": "POST",
+            "data[User][username]": login["email"],
+            "data[User][password]": login["password"],
+            "data[User][captchaToken]": "",
         }
+        response = c.post(login["website"] + "/users/login", data=payload)
 
-        c.post(login['website'] + "/users/login", data=payload)
-        response = c.get(login['website'] + "/users/home")
+        filename = re.sub(r"[^\w_.)( -]", "", data["title"]) + ".jpg"
+        files = {
+            "_method": (None, "POST"),
+            "data[CustomProject][title]": (None, data["title"]),
+            "data[CustomDocument][custom_grant_type_id]": (None, 1),
+            "data[CustomDocument][amount]": (None, data["amount"]),
+            "data[CustomDocument][status_id]": (None, 1),
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:139.0) Gecko/20100101 Firefox/139.0",
+            "Referer": login["website"] + "/custom_grants",
+            "Origin": login["website"],
+            "Cookie": "CAKEPHP=" + c.cookies.get("CAKEPHP") + "; kt_aside_menu=0",
+        }
+        response = c.request(
+            "POST", login["website"] + "/CustomGrants", files=files, headers=headers
+        )
+        print(response.status_code)
+        return response.status_code
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        return (response.status_code, soup.title.string)
 
-
-async def send_receipt(login: dict, channel) -> None:
-    c = asyncio.to_thread(send_receipt_sync, login)
+async def send_receipt(login: dict, data: dict, channel) -> None:
+    c = asyncio.to_thread(send_receipt_sync, login, data)
     result = await c
-    await channel.send(f"response {result[0]}, loaded website {result[1]}")
+    await channel.send(f"response {result}")
 
 
 # ----------------------MAIN PROGRAM----------------------

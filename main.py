@@ -25,13 +25,13 @@ class FredBot(commands.Bot):
             intents=intents,
             command_prefix=command_prefix,
             description="DnD Discord Bot",
-            activity=discord.Game(
-                name="Here to help you roll absolute garbage"))
+            activity=discord.Game(name="Here to help you roll absolute garbage"),
+        )
 
     async def on_ready(self) -> None:
         # login, probably want to log more info here
-        print(f'Logged in as {self.user} (ID: {self.user.id})')
-        print('------')
+        print(f"Logged in as {self.user} (ID: {self.user.id})")
+        print("------")
 
     async def setup_hook(self) -> None:
         # Do any data processing to get data into memory here:
@@ -39,12 +39,12 @@ class FredBot(commands.Bot):
         # Load cogs:
         print("loading cogs:")
         extensions = [
-            'cogs.dice_roller',
-            'cogs.quest_handler',
-            'cogs.sticky_handler',
-            'cogs.archive_handler',
-            'cogs.whale_handler',
-            'cogs.receipts_handler'
+            "cogs.dice_roller",
+            "cogs.quest_handler",
+            "cogs.sticky_handler",
+            "cogs.archive_handler",
+            "cogs.whale_handler",
+            "cogs.receipts_handler",
         ]
 
         for extension in extensions:
@@ -52,13 +52,14 @@ class FredBot(commands.Bot):
                 await bot.load_extension(extension)
                 print(f"\t{extension} loaded")
             except Exception as e:
-                print(f'Failed to load extension {extension}.')
+                print(f"Failed to load extension {extension}.")
                 traceback.print_exc()
 
         # Sync app commands with Discord:
         # await self.tree.sync()
         # self.tree.copy_global_to(guild=TEST_GUILD)
         # await self.tree.sync(guild=TEST_GUILD)
+
 
 # ------------------------MAIN CODE-----------------------
 bot = FredBot(command_prefix="!")
