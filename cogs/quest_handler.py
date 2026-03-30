@@ -167,11 +167,13 @@ class BaseQuestModal(discord.ui.Modal):
                 await interaction.followup.send(message, ephemeral=True)
                 return
 
+        quest_colour = discord.Color.from_str(self.embed_colour)
+
         # Create the quest embed for use later.
         embed = discord.Embed(
             title=self.quest_title.value,
             description=self.description.value,
-            color=discord.Color.from_str(self.embed_colour),
+            color=quest_colour,
         )
 
         embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.avatar.url)
@@ -193,7 +195,9 @@ class BaseQuestModal(discord.ui.Modal):
                 await self.message.edit(content="", embed=embed)
 
             # Create or edit quest role with the quest title:
-            await self.message.guild.get_role(quest_role_id).edit(name=self.quest_title.value)
+            await self.message.guild.get_role(quest_role_id).edit(
+                name=self.quest_title.value, color=quest_colour
+            )
 
             # Get Thread and update title
             thread = self.message.channel.get_thread(thread_id)
@@ -230,7 +234,10 @@ class BaseQuestModal(discord.ui.Modal):
 
             # Create or edit quest role with the quest title:
             quest_role = await interaction.guild.create_role(
-                name=self.quest_title.value, mentionable=True, reason="New Quest created"
+                name=self.quest_title.value,
+                mentionable=True,
+                reason="New Quest created",
+                color=quest_colour,
             )
             quest_role_id = quest_role.id
 
@@ -242,9 +249,7 @@ class BaseQuestModal(discord.ui.Modal):
 
             # Send the player amount message in the thread and pin it.
             pin_message: discord.Message = await thread.send(
-                embed=discord.Embed(
-                    title="Players:", color=discord.Color.from_str(self.embed_colour)
-                )
+                embed=discord.Embed(title="Players:", color=quest_colour)
             )
             await pin_message.pin()
 
