@@ -1,0 +1,11 @@
+[project]
+name = "fred"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "discord>=2.3.2",
+    "discord-py>=2.7.1",
+    "webcolors>=25.10.0",
+]

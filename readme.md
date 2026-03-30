@@ -1,5 +1,17 @@
 # Nat 1 Fred, the discord bot
 
+This project is managed by and can be run with uv. If you have uv installed on
+your system run with the following:
+```sh
+uv run main.py
+```
+
+to set up the database, run
+```sh
+uv run db_handler.py
+```
+
+
 ## Purpose
 
 This is a discord bot written in Python that runs the quest system,
