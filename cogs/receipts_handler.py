@@ -1,7 +1,10 @@
+from concurrent.futures import thread
 from os import environ
+from typing import Self
 
 import discord
-from discord import app_commands
+from discord import CategoryChannel, ForumChannel, TextChannel, Thread, app_commands
+from discord.abc import GuildChannel
 from discord.ext import commands
 
 import db_handler as db
@@ -52,9 +55,7 @@ class ReceiptDenyModal(discord.ui.Modal):
 
 
 class PublicMessageView(discord.ui.View):
-    def __init__(
-        self, message_id: int, message_jump: str, disabled: bool = False
-    ) -> None:
+    def __init__(self, message_id: int, message_jump: str, disabled: bool = False) -> None:
 
         self.message_id = message_id
         self.message_jump = message_jump
@@ -81,7 +82,7 @@ class PublicMessageView(discord.ui.View):
         super().__init__(timeout=None)
 
     async def accept_receipt(
-        self, interaction: discord.Interaction, button: discord.ui.Button
+        self, interaction: discord.Interaction, _button: discord.ui.Button[Self]
     ) -> None:
         await interaction.response.defer()
         # - TODO: fix actual web scraping / pushing here!
@@ -96,17 +97,18 @@ class PublicMessageView(discord.ui.View):
 
             await interaction.followup.send(f"{interaction.user} accepted receipt!")
         else:
-            await interaction.followup.send(
-                "Error, cannot find the image in that message!"
-            )
+            await interaction.followup.send("Error, cannot find the image in that message!")
 
     async def deny_receipt(
-        self, interaction: discord.Interaction, button: discord.ui.Button
+        self, interaction: discord.Interaction, _button: discord.ui.Button[Self]
     ) -> None:
+        assert interaction.message
         embed = interaction.message.embeds[0]
+        assert embed.author.url
+        assert embed.fields[0].name
         # await db.del_receipt_board(interaction.message.id)
         # await interaction.message.edit(view=PublicMessageView(self.message_id, True))
-        await interaction.response.send_modal(
+        _ = await interaction.response.send_modal(
             ReceiptDenyModal(
                 int(embed.author.url[8:-12]),
                 embed.fields[0].name,
@@ -149,9 +151,12 @@ class ReceiptsHandler(commands.Cog):
 
         await interaction.response.defer(thinking=False)
 
-        public_msg: discord.Message = await interaction.followup.send(embed=embed)
+        public_msg: discord.WebhookMessage = await interaction.followup.send(embed=embed, wait=True)
 
-        board_msg = await self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID)).send(
+        channel = self.bot.get_channel(int(BOARD_RECEIPTS_CHANNEL_ID))
+        assert isinstance(channel, (TextChannel, Thread))
+
+        board_msg = await channel.send(
             embed=embed, view=PublicMessageView(public_msg.id, public_msg.jump_url)
         )
         await db.create_receipt(public_msg.id, board_msg.id)

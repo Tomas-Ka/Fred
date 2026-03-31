@@ -1,16 +1,16 @@
-import asqlite
-from sqlite3 import Error
 import asyncio
-from helpers import QuestInfo
+from sqlite3 import Error
 
+import asqlite
+
+from helpers import QuestInfo
 
 global db_file
 db_file = "db.sqlite"
 
 
 async def _create_tables() -> None:
-    """Initialization function to create the database if it doesn't exist yet.
-    """
+    """Initialization function to create the database if it doesn't exist yet."""
     create_quests_table = """
     CREATE TABLE IF NOT EXISTS quests (
         "id" INTEGER PRIMARY KEY NOT NULL,
@@ -161,7 +161,13 @@ async def get_quest_by_title(guild_id: int, quest_title: str) -> tuple[int, Ques
 
     # This returns a list and we take the first object as there should only
     # ever be one due to unique constraints in the db.
-    query_return = await _execute_read_query(quest_query, (quest_title, guild_id,))
+    query_return = await _execute_read_query(
+        quest_query,
+        (
+            quest_title,
+            guild_id,
+        ),
+    )
     if query_return:
         quest = QuestInfo(*query_return[1:])
         return (query_return[0], quest)
@@ -266,7 +272,8 @@ async def create_quest(id: int, quest_info: QuestInfo) -> None:
         quest_info.embed_colour,
         quest_info.thread_id,
         quest_info.quest_role_id,
-        quest_info.pin_message_id,)
+        quest_info.pin_message_id,
+    )
 
     await _execute_query(quest_add, vars)
 
@@ -326,7 +333,13 @@ async def del_quest_by_title(guild_id: int, quest_title: str) -> None:
     AND
         guild_id = ?
     """
-    await _execute_query(quest_del, (quest_title, guild_id,))
+    await _execute_query(
+        quest_del,
+        (
+            quest_title,
+            guild_id,
+        ),
+    )
 
 
 async def del_quest(id: int) -> None:
@@ -356,7 +369,7 @@ async def get_sticky(channel_id: int) -> int:
     return (await _execute_read_query(sticky_query, (channel_id,)))[1]
 
 
-async def get_sticky_list() -> list[tuple]:
+async def get_sticky_list() -> list[tuple[int, int]]:
     """Returns a list of all stickies in the database.
 
     Returns:
@@ -380,7 +393,13 @@ async def create_sticky(channel_id: int, message_id: int) -> None:
     VALUES
         (?, ?);
     """
-    await _execute_query(sticky_add, (channel_id, message_id,))
+    await _execute_query(
+        sticky_add,
+        (
+            channel_id,
+            message_id,
+        ),
+    )
 
 
 async def update_sticky(channel_id: int, message_id: int) -> None:
@@ -397,7 +416,13 @@ async def update_sticky(channel_id: int, message_id: int) -> None:
     WHERE
         channel_id = ?
     """
-    await _execute_query(sticky_update, (message_id, channel_id,))
+    await _execute_query(
+        sticky_update,
+        (
+            message_id,
+            channel_id,
+        ),
+    )
 
 
 async def del_sticky(channel_id: int):
@@ -429,7 +454,13 @@ async def get_player(guild_id: int, player_id: int) -> int:
         guild_id = ?;
     """
 
-    query_return = await _execute_read_query(player_query, (player_id, guild_id,))
+    query_return = await _execute_read_query(
+        player_query,
+        (
+            player_id,
+            guild_id,
+        ),
+    )
     if query_return is None:
         # The player doesn't exist in the db, let's add them.
         player_add = """
@@ -480,7 +511,14 @@ async def create_receipt(public_message_id: int, board_message_id: int) -> None:
         VALUES
             (?, ?);
     """
-    await _execute_query(receipt_update, (public_message_id, board_message_id,))
+    await _execute_query(
+        receipt_update,
+        (
+            public_message_id,
+            board_message_id,
+        ),
+    )
+
 
 async def get_receipt_list() -> list[tuple[int, int]]:
     """Returns a list of all receipts in the database
@@ -489,6 +527,7 @@ async def get_receipt_list() -> list[tuple[int, int]]:
     """
     receipts_get = """SELECT * FROM receipts"""
     return await _execute_multiple_read_query(receipts_get)
+
 
 async def del_receipt_public(public_message_id: int) -> None:
     """Remove a receipt from the db given the public id

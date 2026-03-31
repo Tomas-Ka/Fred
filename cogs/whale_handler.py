@@ -1,17 +1,19 @@
-from discord.ext import commands
-import discord
 from time import time
+
+import discord
+from discord.ext import commands
 
 
 class WhaleHandler(commands.Cog):
     bot: commands.Bot
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.time = time()
+        self.time: float = time()
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message) -> None:
+        assert self.bot.user
         # This is only for the character sticky messages.
         # If the bot sent the message, ignore.
         if msg.author.id == self.bot.user.id:

@@ -1,21 +1,22 @@
 import json
 
 
-class QuestInfo():
+class QuestInfo:
     # This is just a blank class so I can pass Quest data as a single
     # object.
     def __init__(
-            self,
-            guild_id: int,
-            quest_title: str,
-            contractor: str,
-            description: str,
-            reward: str,
-            embed_colour: str,
-            thread_id: int,
-            quest_role_id: int,
-            pin_message_id: int,
-            players: str = None) -> None:
+        self,
+        guild_id: int,
+        quest_title: str,
+        contractor: str,
+        description: str,
+        reward: str,
+        embed_colour: str,
+        thread_id: int,
+        quest_role_id: int,
+        pin_message_id: int,
+        players: str = None,
+    ) -> None:
         self.guild_id = guild_id
         self.quest_title = quest_title
         self.contractor = contractor
@@ -54,4 +55,5 @@ class QuestInfo():
             self._players.remove(member)
         except ValueError:
             print(
-                f"can't remove player with id {member} from quest {self.quest_title} as they don't exist in the list")
+                f"can't remove player with id {member} from quest {self.quest_title} as they don't exist in the list"
+            )

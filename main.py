@@ -29,6 +29,7 @@ class FredBot(commands.Bot):
         )
 
     async def on_ready(self) -> None:
+        assert self.user
         # login, probably want to log more info here
         print(f"Logged in as {self.user} (ID: {self.user.id})")
         print("------")
@@ -44,7 +45,7 @@ class FredBot(commands.Bot):
             "cogs.sticky_handler",
             "cogs.archive_handler",
             "cogs.whale_handler",
-            "cogs.receipts_handler",
+            # "cogs.receipts_handler",
         ]
 
         for extension in extensions:
