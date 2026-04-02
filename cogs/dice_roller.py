@@ -129,7 +129,7 @@ class DiceRoller(commands.Cog):
             embed.add_field(name="modifiers", value=modifiers, inline=False)
         embed.add_field(name="Total", value=total, inline=False)
         # Length of "total" is 5, and of "modifiers" is 9.
-        embed_length = embed_length + 5 + 9 + total + len(modifiers)
+        embed_length = embed_length + 5 + 9 + len(str(total)) + len(modifiers)
 
         if embed_length > 6000:
             await interaction.response.send_message(
