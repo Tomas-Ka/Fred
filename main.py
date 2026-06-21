@@ -1,12 +1,13 @@
 # -*- coding: UTF-8 -*-
 import traceback
 from os import environ
+from typing import override
 
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-load_dotenv()
+_ = load_dotenv()
 token = environ["TEST_TOKEN"]
 
 # -----------------------STATIC VARS----------------------
@@ -34,6 +35,7 @@ class FredBot(commands.Bot):
         print(f"Logged in as {self.user} (ID: {self.user.id})")
         print("------")
 
+    @override
     async def setup_hook(self) -> None:
         # Do any data processing to get data into memory here:
 
@@ -52,7 +54,7 @@ class FredBot(commands.Bot):
             try:
                 await bot.load_extension(extension)
                 print(f"\t{extension} loaded")
-            except Exception as e:
+            except Exception as _:
                 print(f"Failed to load extension {extension}.")
                 traceback.print_exc()
 
