@@ -6,7 +6,7 @@ import asqlite
 from helpers import QuestInfo
 
 global db_file
-db_file = "db.sqlite"
+db_file = "db/db.sqlite"
 
 
 async def _create_tables() -> None:

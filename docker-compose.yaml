@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  fred:
+    image: fred:main
+    container_name: fred
+    # Setup command:
+    # command: uv run db_handler.py
+    restart: on-failure:1
+    environment:
+      TOKEN: ${TOKEN}
+      TEST_TOKEN: ${TEST_TOKEN}
+      TEST_SERVER: ${TEST_SERVER}
+      BOARD_RECEIPTS_CHANNEL: ${BOARD_RECEIPTS_CHANNEL}
+    volumes:
+      - db:/app/db
+
+volumes:
+  db:
