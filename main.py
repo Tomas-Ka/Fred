@@ -8,11 +8,11 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 _ = load_dotenv()
-token = environ["TEST_TOKEN"]
+token = environ["TOKEN"]
 
 # -----------------------STATIC VARS----------------------
 # test guild, discord bot testing grounds
-TEST_GUILD = discord.Object(environ["TEST_SERVER"])
+# TEST_GUILD = discord.Object(environ["TEST_SERVER"])
 
 
 # -----------------------MAIN CLASS-----------------------
