@@ -28,6 +28,7 @@ class FredBot(commands.Bot):
             description="DnD Discord Bot",
             activity=discord.Game(name="Here to help you roll absolute garbage"),
         )
+        self.owner: int = int(environ["OWNER_ID"])
 
     async def on_ready(self) -> None:
         assert self.user
@@ -47,6 +48,7 @@ class FredBot(commands.Bot):
             "cogs.sticky_handler",
             "cogs.archive_handler",
             "cogs.whale_handler",
+            "cogs.cog_handler",
             # "cogs.receipts_handler",
         ]
 
@@ -54,7 +56,7 @@ class FredBot(commands.Bot):
             try:
                 await bot.load_extension(extension)
                 print(f"\t{extension} loaded")
-            except Exception as _:
+            except Exception:
                 print(f"Failed to load extension {extension}.")
                 traceback.print_exc()
 
